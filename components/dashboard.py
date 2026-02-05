@@ -16,20 +16,20 @@ def render_dashboard():
     """Render the analytics dashboard"""
     st.header("📊 Dashboard & Analytics")
     
-    # Action Buttons
-    col_fab1, col_fab2 = st.columns([1, 1])
+    # # Action Buttons
+    # col_fab1, col_fab2 = st.columns([1, 1])
     
-    with col_fab1:
-        if st.button("💸 Add Expense", use_container_width=True, type="primary", key="add_expense_btn"):
-            st.session_state.page = "Transactions"
-            st.rerun()
+    # with col_fab1:
+    #     if st.button("💸 Add Expense", use_container_width=True, type="primary", key="add_expense_btn"):
+    #         st.session_state.page = "Transactions"
+    #         st.rerun()
     
-    with col_fab2:
-        if st.button("💰 Add Income", use_container_width=True, type="secondary", key="add_income_btn"):
-            st.session_state.page = "Transactions"
-            st.rerun()
+    # with col_fab2:
+    #     if st.button("💰 Add Income", use_container_width=True, type="secondary", key="add_income_btn"):
+    #         st.session_state.page = "Transactions"
+    #         st.rerun()
     
-    st.divider()
+    # st.divider()
     
     # Get available years and year-months from database
     available_years = ExpenseModel.get_available_years()

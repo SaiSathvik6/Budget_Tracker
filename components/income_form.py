@@ -5,6 +5,7 @@ import streamlit as st
 from datetime import datetime
 import config
 from database.income_model import IncomeModel
+from database.income_source_model import IncomeSourceModel
 from utils.validators import validate_amount, validate_date, validate_description, validate_category
 
 
@@ -23,9 +24,11 @@ def render_income_form():
             )
         
         with col2:
+            # Get all income sources (default + custom)
+            all_sources = IncomeSourceModel.get_all_sources()
             source = st.selectbox(
                 "🏷️ Source",
-                options=config.INCOME_SOURCES,
+                options=all_sources,
                 help="Select income source"
             )
         
@@ -38,9 +41,10 @@ def render_income_form():
         amount = st.number_input(
             f"💵 Amount ({config.CURRENCY_SYMBOL})",
             min_value=0.0,
-            value=0.0,
+            value=None,
             step=100.0,
             format="%.2f",
+            placeholder="0.0",
             help="Enter the income amount"
         )
         
@@ -61,7 +65,7 @@ def render_income_form():
                 errors.append(error_msg)
             
             # Validate source
-            is_valid, error_msg = validate_category(source, config.INCOME_SOURCES)
+            is_valid, error_msg = validate_category(source, all_sources)
             if not is_valid:
                 errors.append(error_msg)
             

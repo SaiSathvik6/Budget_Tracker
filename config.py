@@ -10,7 +10,6 @@ load_dotenv()
 # MongoDB Configuration
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DATABASE_NAME = "budget_tracker"
-BUDGETS_COLLECTION = "budgets"
 EXPENSES_COLLECTION = "expenses"
 INCOME_COLLECTION = "income"
 

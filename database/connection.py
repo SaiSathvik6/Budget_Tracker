@@ -39,10 +39,6 @@ class DatabaseConnection:
     def _create_indexes(self):
         """Create necessary indexes for collections"""
         try:
-            # Budget collection indexes
-            budgets = self._db[config.BUDGETS_COLLECTION]
-            budgets.create_index([("month", ASCENDING)], unique=True)
-            
             # Expense collection indexes
             expenses = self._db[config.EXPENSES_COLLECTION]
             expenses.create_index([("date", DESCENDING)])
