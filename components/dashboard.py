@@ -16,21 +16,6 @@ def render_dashboard():
     """Render the analytics dashboard"""
     st.header("📊 Dashboard & Analytics")
     
-    # # Action Buttons
-    # col_fab1, col_fab2 = st.columns([1, 1])
-    
-    # with col_fab1:
-    #     if st.button("💸 Add Expense", use_container_width=True, type="primary", key="add_expense_btn"):
-    #         st.session_state.page = "Transactions"
-    #         st.rerun()
-    
-    # with col_fab2:
-    #     if st.button("💰 Add Income", use_container_width=True, type="secondary", key="add_income_btn"):
-    #         st.session_state.page = "Transactions"
-    #         st.rerun()
-    
-    # st.divider()
-    
     # Get available years and year-months from database
     available_years = ExpenseModel.get_available_years()
     available_year_months = ExpenseModel.get_available_year_months()
@@ -149,31 +134,25 @@ def render_kpi_cards(start_date, end_date, filter_label):
     with col1:
         st.metric(
             "💰 Income",
-            format_currency(filtered_income),
-            delta=f"+{filtered_income:,.0f}" if filtered_income > 0 else None
+            format_currency(filtered_income)
         )
     
     with col2:
         st.metric(
             "💸 Expenses",
-            format_currency(filtered_spent),
-            delta=f"-{filtered_spent:,.0f}" if filtered_spent > 0 else None,
-            delta_color="inverse"
+            format_currency(filtered_spent)
         )
     
     with col3:
         st.metric(
             "💵 Net Balance",
-            format_currency(net_balance),
-            delta="Income - Expenses",
-            delta_color="normal" if net_balance >= 0 else "inverse"
+            format_currency(net_balance)
         )
     
     with col4:
         st.metric(
             "📊 Transactions",
-            f"{expense_count}",
-            delta=f"{expense_count} expense{'s' if expense_count != 1 else ''}"
+            f"{expense_count}"
         )
 
 
