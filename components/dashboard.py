@@ -8,7 +8,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 import config
 from database.models import ExpenseModel
-from database.category_model import CategoryModel
 from utils.helpers import format_currency, calculate_percentage, get_current_month_range, get_month_name, get_month_start_end
 
 
@@ -107,9 +106,6 @@ def render_dashboard():
     
     st.divider()
     
-    # Recent expenses table (filtered)
-    render_recent_expenses(start_date, end_date, filter_label)
-
 
 def render_kpi_cards(start_date, end_date, filter_label):
     """Render KPI cards at the top of dashboard"""
@@ -366,142 +362,3 @@ def render_category_breakdown(start_date, end_date, filter_label):
     st.dataframe(df_sorted, use_container_width=True, hide_index=True)
 
 
-def render_recent_expenses(start_date, end_date, filter_label):
-    """Render recent expenses table with edit/delete options"""
-    st.subheader(f"📝 Expenses ({filter_label})")
-    
-    # Get filtered expenses
-    if start_date and end_date:
-        expenses = ExpenseModel.get_expenses(start_date, end_date)
-        total_expenses_count = len(ExpenseModel.get_expenses(start_date, end_date))
-    else:
-        expenses = ExpenseModel.get_expenses()
-        total_expenses_count = len(ExpenseModel.get_expenses())
-    
-    if not expenses:
-        st.info(f"No expenses recorded for {filter_label}.")
-        return
-    
-    # Limit to 50 for display
-    display_count = min(len(expenses), 50)
-    expenses = expenses[:display_count]
-    
-    st.caption(f"Showing {display_count} of {total_expenses_count} expenses")
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(expenses)
-    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%d %b %Y")
-    df["amount"] = df["amount"].apply(lambda x: f"{config.CURRENCY_SYMBOL}{x:,.2f}")
-    
-    # Select columns to display
-    display_df = df[["date", "category", "description", "amount"]].copy()
-    display_df.columns = ["Date", "Category", "Description", "Amount"]
-    
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
-    
-    # Edit/Delete section
-    with st.expander("✏️ Edit or Delete Expense"):
-        if len(expenses) > 0:
-            # Create selection dropdown
-            expense_options = [
-                f"{exp['date'].strftime('%d %b %Y')} - {exp['category']} - {exp['description']} - {config.CURRENCY_SYMBOL}{exp['amount']:,.2f}"
-                for exp in expenses
-            ]
-            
-            selected_idx = st.selectbox(
-                "Select expense to edit/delete",
-                options=range(len(expense_options)),
-                format_func=lambda x: expense_options[x]
-            )
-            
-            selected_expense = expenses[selected_idx]
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("✏️ Edit", type="primary", use_container_width=True, key="edit_expense_btn"):
-                    st.session_state.editing_expense = selected_expense
-                    st.rerun()
-            
-            with col2:
-                if st.button("🗑️ Delete", type="primary", use_container_width=True, key="delete_expense_btn"):
-                    if ExpenseModel.delete_expense(str(selected_expense["_id"])):
-                        st.success("Expense deleted successfully!")
-                        st.rerun()
-                    else:
-                        st.error("Failed to delete expense.")
-    
-    # Edit form (if editing)
-    if "editing_expense" in st.session_state:
-        render_edit_form(st.session_state.editing_expense)
-
-
-def render_edit_form(expense):
-    """Render edit form for an expense"""
-    st.divider()
-    st.subheader("✏️ Edit Expense")
-    
-    with st.form("edit_expense_form"):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            new_date = st.date_input(
-                "Date",
-                value=expense["date"],
-                max_value=datetime.now()
-            )
-        
-        with col2:
-            all_categories = CategoryModel.get_all_categories()
-            # Find index of current category
-            try:
-                cat_index = all_categories.index(expense["category"])
-            except ValueError:
-                cat_index = 0
-            
-            new_category = st.selectbox(
-                "Category",
-                options=all_categories,
-                index=cat_index
-            )
-        
-        new_description = st.text_input(
-            "Description",
-            value=expense["description"]
-        )
-        
-        new_amount = st.number_input(
-            f"Amount ({config.CURRENCY_SYMBOL})",
-            value=float(expense["amount"]),
-            min_value=0.0,
-            step=10.0,
-            format="%.2f"
-        )
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            submitted = st.form_submit_button("💾 Save Changes", use_container_width=True)
-        
-        with col2:
-            cancelled = st.form_submit_button("❌ Cancel", use_container_width=True)
-        
-        if submitted:
-            new_datetime = datetime.combine(new_date, datetime.min.time())
-            
-            if ExpenseModel.update_expense(
-                str(expense["_id"]),
-                new_datetime,
-                new_category,
-                new_description,
-                new_amount
-            ):
-                st.success("Expense updated successfully!")
-                del st.session_state.editing_expense
-                st.rerun()
-            else:
-                st.error("Failed to update expense.")
-        
-        if cancelled:
-            del st.session_state.editing_expense
-            st.rerun()
