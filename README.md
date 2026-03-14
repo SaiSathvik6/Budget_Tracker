@@ -32,14 +32,6 @@ A full-featured personal finance tracker built with **Streamlit** and **MongoDB*
 - 💡 Bills
 - 📦 Other
 
-## 🚀 Prerequisites
-
-Before running the application, ensure you have:
-
-1. **Python 3.8 or higher** installed
-2. **MongoDB** installed and running:
-   - **Local MongoDB**: Download from [mongodb.com](https://www.mongodb.com/try/download/community)
-   - **MongoDB Atlas**: Free cloud option at [mongodb.com/atlas](https://www.mongodb.com/cloud/atlas)
 
 ## 📦 Installation
 
@@ -74,103 +66,10 @@ Create a `.env` file in the project root if you need to customize the MongoDB co
 
 ```env
 MONGO_URI=mongodb://localhost:27017/
-```
 
-For MongoDB Atlas, use your connection string:
-```env
-MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/
-```
 
-## 🎯 Quick Start
-
-### 1. Start MongoDB
-
-Ensure MongoDB is running:
-
-**Local MongoDB:**
-```bash
-# Windows (if installed as service, it should already be running)
-net start MongoDB
-
-# macOS/Linux
-sudo systemctl start mongod
-```
-
-**MongoDB Atlas:** No action needed - it's always available
-
-### 2. Insert Sample Data (Optional)
-
-Populate the database with sample expenses for testing:
-
-```bash
-python sample_data.py
-```
-
-This will create:
-- Sample budgets for the last 3 months
-- 40+ sample expenses across all categories
-- Data spanning multiple months for testing analytics
-
-### 3. Run the Application
-
-```bash
-streamlit run app.py
-```
-
-The application will open in your default browser at `http://localhost:8501`
-
-## 📖 Usage Guide
-
-### Adding Expenses and Income
-
-1. Navigate to **"Transactions"** from the sidebar
-2. Choose the appropriate tab:
-   - **Add Expense**: For recording expenses
-   - **Add Income**: For recording income
-   3. Fill in the form:
-   - **Date**: Select transaction date (defaults to today)
-   - **Category**: Choose from dropdown (for expenses) or enter source (for income)
-   - **Description**: Brief description of the transaction
-   - **Amount**: Enter amount in ₹
-4. Click **"Add Expense"** or **"Add Income"**
-5. View instant updates in the sidebar's Financial Status section
-
-### Viewing Dashboard
-
-1. Navigate to **"Dashboard"** from the sidebar
-2. Explore different visualizations:
-   - **Daily Trend**: See spending patterns over the month
-   - **Monthly Comparison**: Compare last 6 months
-   - **Yearly Overview**: Select year to view annual data
-   - **Category Breakdown**: Choose period (current month, 3 months, 6 months)
-3. Scroll down to view recent expenses
-4. Use the **"Edit or Delete Expense"** expander to modify entries
-
-### Managing Settings
-
-1. Navigate to **"Settings"** from the sidebar
-2. **Budget Configuration**:
-   - Update monthly budget amount
-   - Optionally apply to future months
-3. **Export Data**:
-   - Select period (current month, 3 months, 6 months, year, all time)
-   - Click "Generate CSV"
-   - Download the file
-4. **Monthly Reset**:
-   - Use with caution - permanently deletes current month expenses
-
-### Live Financial Status
-
-The sidebar always shows:
-- Current month's income
-- Current month's expenses
-- Net balance (income - expenses)
-- Visual metrics with color-coded indicators
-- Warnings when in deficit
 
 ## 🗂️ Project Structure
-
-```
 Expenses/
 ├── app.py                      # Main Streamlit application
 ├── config.py                   # Configuration settings
@@ -298,92 +197,6 @@ Expenses/
 - Confirmation dialogs for destructive actions
 - Loading states
 
-## 📊 Sample Screenshots
-
-### Dashboard View
-The dashboard displays:
-- 4 KPI cards (Budget, Spent, Remaining, Usage %)
-- Interactive charts in tabs
-- Recent expenses table
-- Edit/delete functionality
-
-### Expense Entry
-Clean form with:
-- Date picker
-- Category dropdown
-- Description input
-- Amount input with validation
-- Quick stats below
-
-### Settings
-Comprehensive settings including:
-- Budget configuration
-- CSV export with period selection
-- Monthly reset option
-- About section
-
-## 🔧 Troubleshooting
-
-### MongoDB Connection Issues
-
-**Error**: "Failed to connect to MongoDB"
-
-**Solutions**:
-1. Verify MongoDB is running: `mongod --version`
-2. Check connection string in `.env` or `config.py`
-3. For Atlas, verify network access and credentials
-4. Check firewall settings
-
-### Import Errors
-
-**Error**: "ModuleNotFoundError"
-
-**Solution**:
-```bash
-pip install -r requirements.txt --upgrade
-```
-
-### Port Already in Use
-
-**Error**: "Address already in use"
-
-**Solution**:
-```bash
-# Run on different port
-streamlit run app.py --server.port 8502
-```
-
-## 🚀 Advanced Configuration
-
-### Custom MongoDB Database Name
-
-Edit `config.py`:
-```python
-DATABASE_NAME = "my_custom_budget_db"
-```
-
-### Change Default Budget
-
-Edit `config.py`:
-```python
-DEFAULT_BUDGET = 75000  # ₹75,000
-```
-
-### Add Custom Categories
-
-Edit `config.py`:
-```python
-CATEGORIES = [
-    "Food",
-    "Transport",
-    "Rent",
-    "Shopping",
-    "Bills",
-    "Healthcare",  # New category
-    "Education",   # New category
-    "Other"
-]
-```
 
 ## 📝 Tips for Better Budget Management
 
@@ -395,21 +208,7 @@ CATEGORIES = [
 6. ⚠️ **Monitor Warnings**: Pay attention to budget alerts
 7. 📈 **Analyze Trends**: Use charts to identify spending patterns
 
-## 🤝 Contributing
 
-This is a personal project, but suggestions and improvements are welcome!
-
-## 📄 License
-
-This project is open source and available for personal use.
-
-## 🆘 Support
-
-For issues or questions:
-1. Check the Troubleshooting section
-2. Verify MongoDB connection
-3. Ensure all dependencies are installed
-4. Check Python version compatibility
 
 ## 🎉 Acknowledgments
 
@@ -420,9 +219,5 @@ Built with:
 - [Pandas](https://pandas.pydata.org/) - Data manipulation library
 
 ---
-
-**Version**: 2.0.0  
-**Last Updated**: February 2026  
-**Author**: Budget Tracker Team
 
 💡 **Happy Budgeting!** Track wisely, spend smartly! 💰
