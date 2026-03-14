@@ -41,12 +41,12 @@ def render_expense_form():
         amount = st.number_input(
             f"💰 Amount ({config.CURRENCY_SYMBOL})",
             min_value=0.0,
-            value=0.0,
+            value=None,
             step=10.0,
             format="%.2f",
+            placeholder="0.0",
             help="Enter the expense amount"
         )
-        
         st.divider()
         
         submitted = st.form_submit_button("💾 Add Expense", use_container_width=True, type="primary")

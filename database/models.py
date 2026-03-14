@@ -9,54 +9,6 @@ import config
 from database.connection import get_db
 
 
-class BudgetModel:
-    """Handle budget-related database operations"""
-    
-    @staticmethod
-    def get_current_budget() -> float:
-        """Get budget for current month"""
-        db = get_db()
-        current_month = datetime.now().strftime("%Y-%m")
-        
-        budget_doc = db[config.BUDGETS_COLLECTION].find_one({"month": current_month})
-        
-        if budget_doc:
-            return budget_doc["amount"]
-        else:
-            # Create default budget for current month
-            BudgetModel.set_budget(current_month, config.DEFAULT_BUDGET)
-            return config.DEFAULT_BUDGET
-    
-    @staticmethod
-    def set_budget(month: str, amount: float) -> bool:
-        """Set or update budget for a specific month"""
-        db = get_db()
-        
-        try:
-            db[config.BUDGETS_COLLECTION].update_one(
-                {"month": month},
-                {
-                    "$set": {
-                        "amount": amount,
-                        "updated_at": datetime.now()
-                    },
-                    "$setOnInsert": {
-                        "created_at": datetime.now()
-                    }
-                },
-                upsert=True
-            )
-            return True
-        except Exception as e:
-            print(f"Error setting budget: {e}")
-            return False
-    
-    @staticmethod
-    def get_budget_for_month(month: str) -> float:
-        """Get budget for a specific month"""
-        db = get_db()
-        budget_doc = db[config.BUDGETS_COLLECTION].find_one({"month": month})
-        return budget_doc["amount"] if budget_doc else config.DEFAULT_BUDGET
 
 
 class ExpenseModel:
