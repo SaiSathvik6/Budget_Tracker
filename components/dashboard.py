@@ -109,43 +109,26 @@ def render_dashboard():
 
 def render_kpi_cards(start_date, end_date, filter_label):
     """Render KPI cards at the top of dashboard"""
-    from database.income_model import IncomeModel
     
-    # Get expenses and income for the filtered period
+    # Get expenses for the filtered period
     if start_date and end_date:
         expenses = ExpenseModel.get_expenses(start_date, end_date)
-        filtered_spent = sum(exp["amount"] for exp in expenses)
-        filtered_income = IncomeModel.get_total_income(start_date, end_date)
     else:
         # All time
         expenses = ExpenseModel.get_expenses()
-        filtered_spent = sum(exp["amount"] for exp in expenses)
-        filtered_income = IncomeModel.get_total_income()
     
-    net_balance = filtered_income - filtered_spent
+    filtered_spent = sum(exp["amount"] for exp in expenses)
     expense_count = len(expenses)
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     
     with col1:
         st.metric(
-            "💰 Income",
-            format_currency(filtered_income)
-        )
-    
-    with col2:
-        st.metric(
-            "💸 Expenses",
+            "💸 Total Expenses",
             format_currency(filtered_spent)
         )
     
-    with col3:
-        st.metric(
-            "💵 Net Balance",
-            format_currency(net_balance)
-        )
-    
-    with col4:
+    with col2:
         st.metric(
             "📊 Transactions",
             f"{expense_count}"

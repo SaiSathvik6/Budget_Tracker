@@ -9,6 +9,8 @@ from components.income_form import render_income_form
 from components.dashboard import render_dashboard
 from components.settings import render_settings
 from components.transactions import render_transactions
+from components.events import render_events
+from database.event_model import EventModel
 
 
 # Page configuration
@@ -65,6 +67,12 @@ st.markdown("""
 if "page" not in st.session_state:
     st.session_state.page = "Dashboard"
 
+# ── Run scheduler on every app load (idempotent – skips already-done events) ──
+try:
+    EventModel.run_due_events()
+except Exception:
+    pass  # Never block the UI for scheduler errors
+
 # Sidebar navigation
 with st.sidebar:
     st.title(f"{config.PAGE_ICON} Expense Tracker")
@@ -91,6 +99,13 @@ with st.sidebar:
         if "editing_expense" in st.session_state:
             del st.session_state.editing_expense
         st.rerun()
+
+    if st.button("🗓️ Events", use_container_width=True,
+                 type="primary" if st.session_state.page == "Events" else "secondary"):
+        st.session_state.page = "Events"
+        if "editing_expense" in st.session_state:
+            del st.session_state.editing_expense
+        st.rerun()
     
     st.markdown("---")
 
@@ -106,6 +121,8 @@ try:
         render_income_form()
     elif st.session_state.page == "Settings":
         render_settings()
+    elif st.session_state.page == "Events":
+        render_events()
 except Exception as e:
     st.error(f"An error occurred: {str(e)}")
     st.exception(e)
