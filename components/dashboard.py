@@ -32,6 +32,7 @@ def render_dashboard():
             "📅 Select Year",
             options=available_years,
             index=0,
+            key="dashboard_year_select",
             help="Select year to view"
         )
     
@@ -84,24 +85,26 @@ def render_dashboard():
     
     st.divider()
     
-    # Charts in tabs
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📈 Daily Trend", 
-        "📊 Monthly Comparison", 
-        "📅 Yearly Overview",
-        "🥧 Category Breakdown"
-    ])
+    # Charts — use radio instead of st.tabs() to avoid Streamlit frontend crash
+    # st.tabs causes "TypeError: Cannot read properties of undefined (reading 'vertical')"
+    # when widget state changes across page navigations
+    chart_tab = st.radio(
+        "View",
+        options=["📈 Daily Trend", "📊 Monthly Comparison", "📅 Yearly Overview", "🥧 Category Breakdown"],
+        horizontal=True,
+        key="dashboard_chart_tab",
+        label_visibility="collapsed"
+    )
     
-    with tab1:
+    st.markdown("<div style='margin-top: 1rem;'></div>", unsafe_allow_html=True)
+    
+    if chart_tab == "📈 Daily Trend":
         render_daily_trend(start_date, end_date, filter_label)
-    
-    with tab2:
+    elif chart_tab == "📊 Monthly Comparison":
         render_monthly_comparison()
-    
-    with tab3:
+    elif chart_tab == "📅 Yearly Overview":
         render_yearly_overview()
-    
-    with tab4:
+    elif chart_tab == "🥧 Category Breakdown":
         render_category_breakdown(start_date, end_date, filter_label)
     
     st.divider()
@@ -228,6 +231,10 @@ def render_yearly_overview():
     
     # Get available years from database
     available_years = ExpenseModel.get_available_years()
+    
+    if not available_years:
+        st.info("No expense data available yet.")
+        return
     
     year = st.selectbox(
         "Select Year",

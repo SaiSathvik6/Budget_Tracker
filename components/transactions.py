@@ -18,6 +18,15 @@ def render_transactions():
     st.subheader("Add New Expense")
     st.markdown("Record your expenses to track your spending.")
     render_expense_form()
+
+    # Handle post-submit success OUTSIDE the form to avoid st.rerun() widget corruption
+    if st.session_state.get("expense_added"):
+        amount = st.session_state.get("expense_added_amount", 0)
+        st.success(f"✅ Expense of {config.CURRENCY_SYMBOL}{amount:,.2f} added successfully!")
+        st.balloons()
+        st.session_state.expense_added = False
+        st.session_state.expense_added_amount = 0
+        st.rerun()
         
     st.divider()
     
@@ -85,70 +94,116 @@ def render_transactions():
 
 
 def render_recent_expenses(start_date, end_date, filter_label):
-    """Render recent expenses table with edit/delete options"""
+    """Render recent expenses table with inline edit/delete buttons per row"""
     st.subheader(f"📝 Expenses ({filter_label})")
-    
+
     # Get filtered expenses
     if start_date and end_date:
         expenses = ExpenseModel.get_expenses(start_date, end_date)
-        total_expenses_count = len(ExpenseModel.get_expenses(start_date, end_date))
+        total_expenses_count = len(expenses)
     else:
         expenses = ExpenseModel.get_expenses()
-        total_expenses_count = len(ExpenseModel.get_expenses())
-    
+        total_expenses_count = len(expenses)
+
     if not expenses:
         st.info(f"No expenses recorded for {filter_label}.")
         return
-    
+
     # Limit to 50 for display
     display_count = min(len(expenses), 50)
     expenses = expenses[:display_count]
-    
+
     st.caption(f"Showing {display_count} of {total_expenses_count} expenses")
-    
-    # Convert to DataFrame
-    df = pd.DataFrame(expenses)
-    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%d %b %Y")
-    df["amount"] = df["amount"].apply(lambda x: f"{config.CURRENCY_SYMBOL}{x:,.2f}")
-    
-    # Select columns to display
-    display_df = df[["date", "category", "description", "amount"]].copy()
-    display_df.columns = ["Date", "Category", "Description", "Amount"]
-    
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
-    
-    # Edit/Delete section
-    with st.expander("✏️ Edit or Delete Expense"):
-        if len(expenses) > 0:
-            # Create selection dropdown
-            expense_options = [
-                f"{exp['date'].strftime('%d %b %Y')} - {exp['category']} - {exp['description']} - {config.CURRENCY_SYMBOL}{exp['amount']:,.2f}"
-                for exp in expenses
-            ]
-            
-            selected_idx = st.selectbox(
-                "Select expense to edit/delete",
-                options=range(len(expense_options)),
-                format_func=lambda x: expense_options[x]
-            )
-            
-            selected_expense = expenses[selected_idx]
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("✏️ Edit", type="primary", use_container_width=True, key="edit_expense_btn"):
-                    st.session_state.editing_expense = selected_expense
+
+    # ── Table styles (scoped to .txn-table container) ─────────────────────────
+    st.markdown("""
+    <style>
+    .txn-header {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #888;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.3rem 0.2rem;
+        border-bottom: 1px solid #333;
+    }
+    /* Target only horizontal blocks that are children of .txn-table */
+    .txn-table [data-testid="stHorizontalBlock"] {
+        gap: 0 !important;
+        align-items: center;
+        margin-bottom: -0.55rem !important;
+        border-bottom: 1px solid #1e1e1e;
+    }
+    .txn-table [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    .txn-table small {
+        line-height: 1.1;
+        display: block;
+        padding: 0.15rem 0;
+    }
+    /* Compact emoji action buttons */
+    .txn-table [data-testid="stButton"] > button {
+        padding: 0 !important;
+        font-size: 0.85rem !important;
+        height: 1.5rem !important;
+        min-height: unset !important;
+        line-height: 1 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Open the scoped container
+    st.markdown("<div class='txn-table'>", unsafe_allow_html=True)
+
+    # Header row  [Date | Category | Description | Amount | Actions]
+    h1, h2, h3, h4, h5 = st.columns([2, 2, 4, 2, 2])
+    with h1:
+        st.markdown("<div class='txn-header'>Date</div>", unsafe_allow_html=True)
+    with h2:
+        st.markdown("<div class='txn-header'>Category</div>", unsafe_allow_html=True)
+    with h3:
+        st.markdown("<div class='txn-header'>Description</div>", unsafe_allow_html=True)
+    with h4:
+        st.markdown("<div class='txn-header'>Amount</div>", unsafe_allow_html=True)
+    with h5:
+        st.markdown("<div class='txn-header'>Actions</div>", unsafe_allow_html=True)
+
+    # ── Data rows ─────────────────────────────────────────────────────────────
+    for exp in expenses:
+        row_id = str(exp["_id"])
+        date_str = exp["date"].strftime("%d %b %Y") if hasattr(exp["date"], "strftime") else str(exp["date"])
+        amount_str = f"{config.CURRENCY_SYMBOL}{exp['amount']:,.2f}"
+        desc = exp.get("description", "") or "—"
+
+        c1, c2, c3, c4, c5 = st.columns([2, 2, 4, 2, 2])
+        with c1:
+            st.markdown(f"<small>{date_str}</small>", unsafe_allow_html=True)
+        with c2:
+            st.markdown(f"<small>{exp['category']}</small>", unsafe_allow_html=True)
+        with c3:
+            st.markdown(f"<small>{desc}</small>", unsafe_allow_html=True)
+        with c4:
+            st.markdown(f"<small><b>{amount_str}</b></small>", unsafe_allow_html=True)
+        with c5:
+            btn1, btn2 = st.columns(2)
+            with btn1:
+                if st.button("✏️", key=f"edit_{row_id}", help="Edit this expense"):
+                    st.session_state.editing_expense = exp
                     st.rerun()
-            
-            with col2:
-                if st.button("🗑️ Delete", type="primary", use_container_width=True, key="delete_expense_btn"):
-                    if ExpenseModel.delete_expense(str(selected_expense["_id"])):
-                        st.success("Expense deleted successfully!")
+            with btn2:
+                if st.button("🗑️", key=f"del_{row_id}", help="Delete this expense"):
+                    if ExpenseModel.delete_expense(row_id):
+                        st.success("Expense deleted!")
                         st.rerun()
                     else:
                         st.error("Failed to delete expense.")
-    
+
+    # Close the scoped container
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
     # Edit form (if editing)
     if "editing_expense" in st.session_state:
         render_edit_form(st.session_state.editing_expense)

@@ -11,6 +11,9 @@ from utils.validators import validate_amount, validate_date, validate_descriptio
 
 def render_expense_form():
     """Render the expense entry form"""
+    # Reset flag at the top of each render
+    if "expense_added" not in st.session_state:
+        st.session_state.expense_added = False
     
     with st.form("expense_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
@@ -92,9 +95,8 @@ def render_expense_form():
                 )
                 
                 if success:
-                    st.success(f"✅ Expense of {config.CURRENCY_SYMBOL}{amount:,.2f} added successfully!")
-                    st.balloons()
-                    # Rerun to update the dashboard
-                    st.rerun()
+                    # Set flag and rerun OUTSIDE the form to avoid widget state corruption
+                    st.session_state.expense_added = True
+                    st.session_state.expense_added_amount = amount
                 else:
                     st.error("❌ Failed to add expense. Please try again.")
