@@ -12,12 +12,8 @@ from utils.helpers import format_currency, get_month_name, get_month_start_end
 def render_transactions():
     """Render the transactions page with expense form"""
     st.header("💳 Add Transactions")
-    st.markdown("Add your expense entries here.")
-    
     st.divider()
-    
     st.subheader("Add New Expense")
-    st.markdown("Record your expenses to track your spending.")
     render_expense_form()
 
     # Handle post-submit success OUTSIDE the form to avoid st.rerun() widget corruption
@@ -142,48 +138,49 @@ def render_recent_expenses(start_date, end_date, filter_label):
     </style>
     """, unsafe_allow_html=True)
 
-    # ── JS: inject style into parent frame to beat emotion CSS specificity ────
-    components.html("""
-    <script>
-    (function() {
-        var css = [
-            '[data-testid="stButton"] > button {',
-            '    padding: 0 !important;',
-            '    margin: 0 !important;',
-            '    border: none !important;',
-            '    border-radius: 0 !important;',
-            '    background: transparent !important;',
-            '    background-color: transparent !important;',
-            '    box-shadow: none !important;',
-            '    outline: none !important;',
-            '    min-width: 0 !important;',
-            '    min-height: 0 !important;',
-            '    height: auto !important;',
-            '    width: auto !important;',
-            '    font-size: 1.1rem !important;',
-            '    line-height: 1 !important;',
-            '}',
-            '[data-testid="stButton"] > button:hover,',
-            '[data-testid="stButton"] > button:focus {',
-            '    background: transparent !important;',
-            '    background-color: transparent !important;',
-            '    border: none !important;',
-            '    box-shadow: none !important;',
-            '    outline: none !important;',
-            '}'
-        ].join('\\n');
-        try {
-            var parent = window.parent.document;
-            if (!parent.getElementById('txn-icon-btn-reset')) {
-                var style = parent.createElement('style');
-                style.id = 'txn-icon-btn-reset';
-                style.textContent = css;
-                parent.head.appendChild(style);
-            }
-        } catch(e) { console.warn('txn style inject failed', e); }
-    })();
-    </script>
-    """, height=1)
+    # -- JS: inject style into parent frame (scoped to main area only) ----------
+    _icon_btn_css = (
+        '[data-testid="stMain"] [data-testid="stButton"] > button:not([kind="primary"]) {'
+        '  padding: 0 !important;'
+        '  margin: 0 !important;'
+        '  border: none !important;'
+        '  border-radius: 0 !important;'
+        '  background: transparent !important;'
+        '  background-color: transparent !important;'
+        '  box-shadow: none !important;'
+        '  outline: none !important;'
+        '  min-width: 0 !important;'
+        '  min-height: 0 !important;'
+        '  height: auto !important;'
+        '  width: auto !important;'
+        '  font-size: 1.1rem !important;'
+        '  line-height: 1 !important;'
+        '}'
+        '[data-testid="stMain"] [data-testid="stButton"] > button:not([kind="primary"]):hover,'
+        '[data-testid="stMain"] [data-testid="stButton"] > button:not([kind="primary"]):focus {'
+        '  background: transparent !important;'
+        '  background-color: transparent !important;'
+        '  border: none !important;'
+        '  box-shadow: none !important;'
+        '  outline: none !important;'
+        '}'
+    )
+    components.html(
+        '<script>'
+        '(function(){'
+        '  try {'
+        '    var p = window.parent.document;'
+        '    if (!p.getElementById("txn-icon-btn-reset")){'
+        '      var s = p.createElement("style");'
+        '      s.id = "txn-icon-btn-reset";'
+        '      s.textContent = ' + repr(_icon_btn_css) + ';'
+        '      p.head.appendChild(s);'
+        '    }'
+        '  } catch(e){ console.warn("txn style inject failed", e); }'
+        '})();'
+        '</script>',
+        height=1,
+    )
 
     # Open the scoped container
     st.markdown("<div class='txn-table'>", unsafe_allow_html=True)

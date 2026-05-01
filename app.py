@@ -61,9 +61,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
+VALID_PAGES = {"Dashboard", "Transactions", "Settings", "Events"}
+
+# ── Page state: seed from URL query param so reloads land on the right page ──
 if "page" not in st.session_state:
-    st.session_state.page = "Dashboard"
+    qp = st.query_params.get("page", "Dashboard")
+    st.session_state.page = qp if qp in VALID_PAGES else "Dashboard"
+
+# Keep URL in sync with session state (handles the initial load case)
+st.query_params["page"] = st.session_state.page
 
 # ── Run scheduler on every app load (idempotent – skips already-done events) ──
 try:
@@ -71,40 +77,39 @@ try:
 except Exception:
     pass  # Never block the UI for scheduler errors
 
+
+def navigate(page: str):
+    """Switch page, update URL param, and rerun."""
+    st.session_state.page = page
+    st.query_params["page"] = page
+    if "editing_expense" in st.session_state:
+        del st.session_state.editing_expense
+    st.rerun()
+
+
 # Sidebar navigation
 with st.sidebar:
     st.title(f"{config.PAGE_ICON} Expense Tracker")
     st.markdown("---")
-    
-    # Navigation buttons
-    if st.button("📊 Dashboard", use_container_width=True, 
-                 type="primary" if st.session_state.page == "Dashboard" else "secondary"):
-        st.session_state.page = "Dashboard"
-        if "editing_expense" in st.session_state:
-            del st.session_state.editing_expense
-        st.rerun()
-    
+
+    current = st.session_state.page
+
+    if st.button("📊 Dashboard", use_container_width=True,
+                 type="primary" if current == "Dashboard" else "secondary"):
+        navigate("Dashboard")
+
     if st.button("💳 Transactions", use_container_width=True,
-                 type="primary" if st.session_state.page == "Transactions" else "secondary"):
-        st.session_state.page = "Transactions"
-        if "editing_expense" in st.session_state:
-            del st.session_state.editing_expense
-        st.rerun()
-    
+                 type="primary" if current == "Transactions" else "secondary"):
+        navigate("Transactions")
+
     if st.button("⚙️ Settings", use_container_width=True,
-                 type="primary" if st.session_state.page == "Settings" else "secondary"):
-        st.session_state.page = "Settings"
-        if "editing_expense" in st.session_state:
-            del st.session_state.editing_expense
-        st.rerun()
+                 type="primary" if current == "Settings" else "secondary"):
+        navigate("Settings")
 
     if st.button("🗓️ Events", use_container_width=True,
-                 type="primary" if st.session_state.page == "Events" else "secondary"):
-        st.session_state.page = "Events"
-        if "editing_expense" in st.session_state:
-            del st.session_state.editing_expense
-        st.rerun()
-    
+                 type="primary" if current == "Events" else "secondary"):
+        navigate("Events")
+
     st.markdown("---")
 
 # Main content area
