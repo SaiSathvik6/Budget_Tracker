@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import config
 from datetime import datetime
@@ -109,13 +110,9 @@ def render_recent_expenses(start_date, end_date, filter_label):
         st.info(f"No expenses recorded for {filter_label}.")
         return
 
-    # Limit to 50 for display
-    display_count = min(len(expenses), 50)
-    expenses = expenses[:display_count]
+    st.caption(f"Showing {total_expenses_count} expense(s)")
 
-    st.caption(f"Showing {display_count} of {total_expenses_count} expenses")
-
-    # ── Table styles (scoped to .txn-table container) ─────────────────────────
+    # ── Table styles ──────────────────────────────────────────────────────────
     st.markdown("""
     <style>
     .txn-header {
@@ -127,7 +124,6 @@ def render_recent_expenses(start_date, end_date, filter_label):
         padding: 0.3rem 0.2rem;
         border-bottom: 1px solid #333;
     }
-    /* Target only horizontal blocks that are children of .txn-table */
     .txn-table [data-testid="stHorizontalBlock"] {
         gap: 0 !important;
         align-items: center;
@@ -143,16 +139,51 @@ def render_recent_expenses(start_date, end_date, filter_label):
         display: block;
         padding: 0.15rem 0;
     }
-    /* Compact emoji action buttons */
-    .txn-table [data-testid="stButton"] > button {
-        padding: 0 !important;
-        font-size: 0.85rem !important;
-        height: 1.5rem !important;
-        min-height: unset !important;
-        line-height: 1 !important;
-    }
     </style>
     """, unsafe_allow_html=True)
+
+    # ── JS: inject style into parent frame to beat emotion CSS specificity ────
+    components.html("""
+    <script>
+    (function() {
+        var css = [
+            '[data-testid="stButton"] > button {',
+            '    padding: 0 !important;',
+            '    margin: 0 !important;',
+            '    border: none !important;',
+            '    border-radius: 0 !important;',
+            '    background: transparent !important;',
+            '    background-color: transparent !important;',
+            '    box-shadow: none !important;',
+            '    outline: none !important;',
+            '    min-width: 0 !important;',
+            '    min-height: 0 !important;',
+            '    height: auto !important;',
+            '    width: auto !important;',
+            '    font-size: 1.1rem !important;',
+            '    line-height: 1 !important;',
+            '}',
+            '[data-testid="stButton"] > button:hover,',
+            '[data-testid="stButton"] > button:focus {',
+            '    background: transparent !important;',
+            '    background-color: transparent !important;',
+            '    border: none !important;',
+            '    box-shadow: none !important;',
+            '    outline: none !important;',
+            '}'
+        ].join('\\n');
+        try {
+            var parent = window.parent.document;
+            if (!parent.getElementById('txn-icon-btn-reset')) {
+                var style = parent.createElement('style');
+                style.id = 'txn-icon-btn-reset';
+                style.textContent = css;
+                parent.head.appendChild(style);
+            }
+        } catch(e) { console.warn('txn style inject failed', e); }
+    })();
+    </script>
+    """, height=1)
 
     # Open the scoped container
     st.markdown("<div class='txn-table'>", unsafe_allow_html=True)

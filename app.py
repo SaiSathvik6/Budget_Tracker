@@ -4,8 +4,6 @@ Main Streamlit application
 """
 import streamlit as st
 import config
-from components.expense_form import render_expense_form
-from components.income_form import render_income_form
 from components.dashboard import render_dashboard
 from components.settings import render_settings
 from components.transactions import render_transactions
@@ -115,10 +113,6 @@ try:
         render_dashboard()
     elif st.session_state.page == "Transactions":
         render_transactions()
-    elif st.session_state.page == "Add Expense":
-        render_expense_form()
-    elif st.session_state.page == "Add Income":
-        render_income_form()
     elif st.session_state.page == "Settings":
         render_settings()
     elif st.session_state.page == "Events":
