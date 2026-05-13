@@ -14,11 +14,11 @@ import config
 # Main entry point
 # ─────────────────────────────────────────────────────────────────────────────
 
-def render_events():
-    """Render the Events management page."""
-    st.header("🗓️ Recurring Events")
+def render_payments():
+    """Render the Payments management page."""
+    st.header("🗓️ Recurring Payments")
     st.markdown(
-        "Schedule recurring expense entries that are **automatically posted** "
+        "Schedule recurring payment entries that are **automatically posted** "
         "on a chosen day every month."
     )
 
@@ -28,7 +28,7 @@ def render_events():
     st.divider()
 
     tab1, tab2, tab3 = st.tabs(
-        ["📋 My Events", "➕ Add Event", "⚡ Scheduler"]
+        ["📋 My Payments", "➕ Add Payment", "⚡ Scheduler"]
     )
 
     with tab1:
@@ -52,7 +52,7 @@ def _auto_run_scheduler():
     if executed:
         names = ", ".join(r["event"]["title"] for r in executed)
         st.success(
-            f"✅ **Auto-executed {len(executed)} event(s) this month:** {names}"
+            f"✅ **Auto-executed {len(executed)} payment(s) this month:** {names}"
         )
 
 
@@ -65,7 +65,7 @@ def render_event_list():
     events = EventModel.get_all_events()
 
     if not events:
-        st.info("No recurring events yet. Go to **Add Event** to create one.")
+        st.info("No recurring payments yet. Go to **Add Payment** to create one.")
         return
 
     now = datetime.now()
@@ -151,6 +151,12 @@ def render_event_list():
                             )
 
             with col_actions:
+                if st.button("🚀 Execute Now", key=f"exec_{event_id}", use_container_width=True):
+                    if EventModel.execute_single_event(event_id):
+                        st.rerun()
+                    else:
+                        st.error("Failed to execute.")
+
                 toggle_label = "⏸️ Pause" if is_active else "▶️ Resume"
                 if st.button(toggle_label, key=f"toggle_{event_id}", use_container_width=True):
                     EventModel.toggle_event(event_id, not is_active)
@@ -191,11 +197,11 @@ def _render_edit_form(event):
     event_id = str(event["_id"])
     categories = CategoryModel.get_all_categories()
 
-    st.markdown("#### ✏️ Edit Event")
+    st.markdown("#### ✏️ Edit Payment")
     with st.form(f"edit_form_{event_id}"):
         col1, col2 = st.columns(2)
         with col1:
-            title = st.text_input("Event Name", value=event["title"])
+            title = st.text_input("Payment Name", value=event["title"])
             amount = st.number_input(
                 f"Amount ({config.CURRENCY_SYMBOL})",
                 min_value=0.01,
@@ -224,7 +230,7 @@ def _render_edit_form(event):
 
     if submitted:
         if not title.strip():
-            st.error("Event name cannot be empty.")
+            st.error("Payment name cannot be empty.")
         elif amount <= 0:
             st.error("Amount must be positive.")
         else:
@@ -232,11 +238,11 @@ def _render_edit_form(event):
                 event_id, title, category, amount, day_of_month, description, is_active
             )
             if ok:
-                st.success("✅ Event updated!")
+                st.success("✅ Payment updated!")
                 del st.session_state["editing_event"]
                 st.rerun()
             else:
-                st.error("Failed to update event.")
+                st.error("Failed to update payment.")
 
     if cancelled:
         del st.session_state["editing_event"]
@@ -248,10 +254,10 @@ def _render_edit_form(event):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render_add_event_form():
-    """Form to create a new recurring event."""
-    st.subheader("➕ Create Recurring Event")
+    """Form to create a new recurring payment."""
+    st.subheader("➕ Create Recurring Payment")
     st.markdown(
-        "Every event you create will **automatically generate an expense entry** "
+        "Every payment you create will **automatically generate an expense entry** "
         "on the chosen day of each month."
     )
 
@@ -262,9 +268,9 @@ def render_add_event_form():
 
         with col1:
             title = st.text_input(
-                "Event Name *",
+                "Payment Name *",
                 placeholder="e.g. Monthly Rent, Netflix",
-                help="A short, descriptive label for this recurring expense.",
+                help="A short, descriptive label for this recurring payment.",
             )
             amount = st.number_input(
                 f"Amount ({config.CURRENCY_SYMBOL}) *",
@@ -292,20 +298,20 @@ def render_add_event_form():
             placeholder="Optional extra detail",
         )
 
-        submitted = st.form_submit_button("🗓️ Create Event", use_container_width=True, type="primary")
+        submitted = st.form_submit_button("🗓️ Create Payment", use_container_width=True, type="primary")
 
     if submitted:
         if not title.strip():
-            st.error("❌ Event name cannot be empty.")
+            st.error("❌ Payment name cannot be empty.")
         elif amount <= 0:
             st.error("❌ Amount must be greater than zero.")
         else:
             ok = EventModel.create_event(title, category, amount, int(day_of_month), description)
             if ok:
-                st.success(f"✅ Recurring event **'{title.strip()}'** created successfully!")
+                st.success(f"✅ Recurring payment **'{title.strip()}'** created successfully!")
                 st.balloons()
             else:
-                st.error("❌ Failed to create event. Please try again.")
+                st.error("❌ Failed to create payment. Please try again.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -327,7 +333,7 @@ def render_scheduler_panel():
     results = EventModel.run_due_events()
 
     if not results:
-        st.info("No active recurring events found. Add one in the **Add Event** tab.")
+        st.info("No active recurring payments found. Add one in the **Add Payment** tab.")
         return
 
     # Summary counts
@@ -343,7 +349,7 @@ def render_scheduler_panel():
     c5.metric("❌ Failed", counts["failed"])
 
     st.divider()
-    st.markdown("#### Event-by-Event Status")
+    st.markdown("#### Payment-by-Payment Status")
 
     status_icon = {
         "executed": "✅",
@@ -372,19 +378,19 @@ def render_scheduler_panel():
 
     st.markdown("#### 🔁 Force Re-run This Month")
     st.warning(
-        "⚠️ This will re-create expense entries for **all active events** even if they "
+        "⚠️ This will re-create expense entries for **all active payments** even if they "
         "already ran this month. Use only to correct missing entries."
     )
-    if st.button("🔁 Force Execute All Events Now", type="primary"):
+    if st.button("🔁 Force Execute All Payments Now", type="primary"):
         force_results = EventModel.run_due_events(force=True)
         executed = [r for r in force_results if r["status"] == "executed"]
         failed = [r for r in force_results if r["status"] == "failed"]
         if executed:
-            st.success(f"✅ Re-executed {len(executed)} event(s).")
+            st.success(f"✅ Re-executed {len(executed)} payment(s).")
         if failed:
-            st.error(f"❌ {len(failed)} event(s) failed.")
+            st.error(f"❌ {len(failed)} payment(s) failed.")
         if not executed and not failed:
-            st.info("No events to execute.")
+            st.info("No payments to execute.")
         st.rerun()
 
 

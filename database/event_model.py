@@ -297,3 +297,39 @@ class EventModel:
                 })
 
         return results
+
+    @staticmethod
+    def execute_single_event(event_id: str) -> bool:
+        """Manually execute a specific event right now, regardless of due date."""
+        from database.models import ExpenseModel
+        db = get_db()
+        try:
+            event = db[EVENTS_COLLECTION].find_one({"_id": ObjectId(event_id)})
+            if not event:
+                return False
+            
+            now = datetime.now()
+            today = now.date()
+            import calendar
+            
+            day = event["day_of_month"]
+            last_day = calendar.monthrange(today.year, today.month)[1]
+            effective_day = min(day, last_day)
+            
+            expense_date = datetime(today.year, today.month, effective_day)
+            desc = event.get("description") or event["title"]
+            
+            success = ExpenseModel.create_expense(
+                date=expense_date,
+                category=event["category"],
+                description=f"[Manual] {desc}",
+                amount=event["amount"],
+            )
+            
+            if success:
+                EventModel.mark_executed(event_id, today.year, today.month)
+                return True
+            return False
+        except Exception as e:
+            print(f"Error executing single event: {e}")
+            return False

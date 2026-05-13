@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import config
 from datetime import datetime
@@ -30,8 +29,8 @@ def render_transactions():
     # History Section
     st.subheader("📜 Expense History")
     
-    # Year and Month selectors for filtering history
-    col1, col2 = st.columns(2)
+    # Year, Month, and Category selectors for filtering history
+    col1, col2, col3 = st.columns(3)
     
     # Get available years and year-months from database
     available_years = ExpenseModel.get_available_years()
@@ -82,159 +81,136 @@ def render_transactions():
             # No data for selected year, default to current month
             selected_month = current_month
             st.info(f"No data available for {selected_year}. Showing current month.")
+
+    with col3:
+        # Category filter
+        all_categories = CategoryModel.get_all_categories()
+        category_options = ["All Categories"] + all_categories
+        selected_category = st.selectbox(
+            "🏷️ Filter by Category",
+            options=category_options,
+            index=0,
+            help="Filter expenses by category",
+            key="trans_category_select"
+        )
     
     # Get date range for selected month
     start_date, end_date = get_month_start_end(selected_year, selected_month)
     filter_label = f"{get_month_name(selected_month)} {selected_year}"
     
-    render_recent_expenses(start_date, end_date, filter_label)
+    render_recent_expenses(start_date, end_date, filter_label, selected_category)
 
 
-def render_recent_expenses(start_date, end_date, filter_label):
-    """Render recent expenses table with inline edit/delete buttons per row"""
-    st.subheader(f"📝 Expenses ({filter_label})")
+def render_recent_expenses(start_date, end_date, filter_label, selected_category="All Categories"):
+    """Render recent expenses using st.dataframe + action panel (Streamlit 1.31 compatible)"""
 
-    # Get filtered expenses
+    # Get date-filtered expenses
     if start_date and end_date:
         expenses = ExpenseModel.get_expenses(start_date, end_date)
-        total_expenses_count = len(expenses)
     else:
         expenses = ExpenseModel.get_expenses()
-        total_expenses_count = len(expenses)
+
+    # Apply category filter
+    if selected_category and selected_category != "All Categories":
+        expenses = [e for e in expenses if e.get("category") == selected_category]
+
+    total_expenses_count = len(expenses)
 
     if not expenses:
-        st.info(f"No expenses recorded for {filter_label}.")
+        if selected_category and selected_category != "All Categories":
+            st.info(f"No expenses in **{selected_category}** for {filter_label}.")
+        else:
+            st.info(f"No expenses recorded for {filter_label}.")
         return
 
-    st.caption(f"Showing {total_expenses_count} expense(s)")
+    currency = config.CURRENCY_SYMBOL
+    total_amount = sum(e["amount"] for e in expenses)
 
-    # ── Table styles ──────────────────────────────────────────────────────────
-    st.markdown("""
-    <style>
-    .txn-header {
-        font-size: 0.75rem;
-        font-weight: 700;
-        color: #888;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        padding: 0.3rem 0.2rem;
-        border-bottom: 1px solid #333;
-    }
-    .txn-table [data-testid="stHorizontalBlock"] {
-        gap: 0 !important;
-        align-items: center;
-        margin-bottom: -0.55rem !important;
-        border-bottom: 1px solid #1e1e1e;
-    }
-    .txn-table [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-    }
-    .txn-table small {
-        line-height: 1.1;
-        display: block;
-        padding: 0.15rem 0;
-    }
-    </style>
+    # ── Build DataFrame for display ───────────────────────────────────────────
+    rows = []
+    for exp in expenses:
+        date_val = exp["date"].date() if hasattr(exp["date"], "date") else exp["date"]
+        rows.append({
+            "Date":        date_val,
+            "Category":    exp.get("category", "—"),
+            "Description": exp.get("description", "") or "—",
+            "Amount":      exp["amount"],
+        })
+
+    df = pd.DataFrame(rows)
+
+    st.dataframe(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Date": st.column_config.DateColumn("Date", format="DD MMM YYYY", width="small"),
+            "Category": st.column_config.TextColumn("Category", width="small"),
+            "Description": st.column_config.TextColumn("Description"),
+            "Amount": st.column_config.NumberColumn(
+                "Amount",
+                format=f"{currency}%.2f",
+                width="small",
+            ),
+        },
+    )
+
+    # ── Fixed total bar ────────────────────────────────────────────────────────
+    st.markdown(f"""
+    <div style="
+        display:flex; justify-content:space-between; align-items:center;
+        padding:8px 4px; margin-top:-0.5rem; margin-bottom:0.75rem;
+        border-top: 1px solid #2a2a2a;
+    ">
+      <span style="color:#666; font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">
+        {total_expenses_count} expense(s)
+      </span>
+      <span style="color:#ff6b35; font-weight:700; font-size:1rem;">
+        Total &nbsp; {currency}{total_amount:,.2f}
+      </span>
+    </div>
     """, unsafe_allow_html=True)
 
-    # -- JS: inject style into parent frame (scoped to main area only) ----------
-    _icon_btn_css = (
-        '[data-testid="stMain"] [data-testid="stButton"] > button:not([kind="primary"]) {'
-        '  padding: 0 !important;'
-        '  margin: 0 !important;'
-        '  border: none !important;'
-        '  border-radius: 0 !important;'
-        '  background: transparent !important;'
-        '  background-color: transparent !important;'
-        '  box-shadow: none !important;'
-        '  outline: none !important;'
-        '  min-width: 0 !important;'
-        '  min-height: 0 !important;'
-        '  height: auto !important;'
-        '  width: auto !important;'
-        '  font-size: 1.1rem !important;'
-        '  line-height: 1 !important;'
-        '}'
-        '[data-testid="stMain"] [data-testid="stButton"] > button:not([kind="primary"]):hover,'
-        '[data-testid="stMain"] [data-testid="stButton"] > button:not([kind="primary"]):focus {'
-        '  background: transparent !important;'
-        '  background-color: transparent !important;'
-        '  border: none !important;'
-        '  box-shadow: none !important;'
-        '  outline: none !important;'
-        '}'
-    )
-    components.html(
-        '<script>'
-        '(function(){'
-        '  try {'
-        '    var p = window.parent.document;'
-        '    if (!p.getElementById("txn-icon-btn-reset")){'
-        '      var s = p.createElement("style");'
-        '      s.id = "txn-icon-btn-reset";'
-        '      s.textContent = ' + repr(_icon_btn_css) + ';'
-        '      p.head.appendChild(s);'
-        '    }'
-        '  } catch(e){ console.warn("txn style inject failed", e); }'
-        '})();'
-        '</script>',
-        height=1,
-    )
+    # ── Row action panel ──────────────────────────────────────────────────────
+    st.markdown("**Actions**")
 
-    # Open the scoped container
-    st.markdown("<div class='txn-table'>", unsafe_allow_html=True)
-
-    # Header row  [Date | Category | Description | Amount | Actions]
-    h1, h2, h3, h4, h5 = st.columns([2, 2, 4, 2, 2])
-    with h1:
-        st.markdown("<div class='txn-header'>Date</div>", unsafe_allow_html=True)
-    with h2:
-        st.markdown("<div class='txn-header'>Category</div>", unsafe_allow_html=True)
-    with h3:
-        st.markdown("<div class='txn-header'>Description</div>", unsafe_allow_html=True)
-    with h4:
-        st.markdown("<div class='txn-header'>Amount</div>", unsafe_allow_html=True)
-    with h5:
-        st.markdown("<div class='txn-header'>Actions</div>", unsafe_allow_html=True)
-
-    # ── Data rows ─────────────────────────────────────────────────────────────
+    # Build human-readable labels for each row
+    row_labels = []
     for exp in expenses:
-        row_id = str(exp["_id"])
         date_str = exp["date"].strftime("%d %b %Y") if hasattr(exp["date"], "strftime") else str(exp["date"])
-        amount_str = f"{config.CURRENCY_SYMBOL}{exp['amount']:,.2f}"
-        desc = exp.get("description", "") or "—"
+        row_labels.append(f"{date_str}  ·  {exp.get('category','?')}  ·  {currency}{exp['amount']:,.2f}")
 
-        c1, c2, c3, c4, c5 = st.columns([2, 2, 4, 2, 2])
-        with c1:
-            st.markdown(f"<small>{date_str}</small>", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"<small>{exp['category']}</small>", unsafe_allow_html=True)
-        with c3:
-            st.markdown(f"<small>{desc}</small>", unsafe_allow_html=True)
-        with c4:
-            st.markdown(f"<small><b>{amount_str}</b></small>", unsafe_allow_html=True)
-        with c5:
-            btn1, btn2 = st.columns(2)
-            with btn1:
-                if st.button("✏️", key=f"edit_{row_id}", help="Edit this expense"):
-                    st.session_state.editing_expense = exp
-                    st.rerun()
-            with btn2:
-                if st.button("🗑️", key=f"del_{row_id}", help="Delete this expense"):
-                    if ExpenseModel.delete_expense(row_id):
-                        st.success("Expense deleted!")
-                        st.rerun()
-                    else:
-                        st.error("Failed to delete expense.")
+    selected_label = st.selectbox(
+        "Select expense",
+        options=row_labels,
+        index=0,
+        label_visibility="collapsed",
+        key="txn_row_select",
+    )
 
-    # Close the scoped container
-    st.markdown("</div>", unsafe_allow_html=True)
+    selected_idx = row_labels.index(selected_label)
+    selected_exp = expenses[selected_idx]
+    selected_id  = str(selected_exp["_id"])
 
+    col_edit, col_del, col_spacer = st.columns([1, 1, 6])
+
+    with col_edit:
+        if st.button("✏️ Edit", key="txn_edit_btn", use_container_width=True):
+            st.session_state.editing_expense = selected_exp
+            st.rerun()
+
+    with col_del:
+        if st.button("🗑️ Delete", key="txn_del_btn", use_container_width=True):
+            if ExpenseModel.delete_expense(selected_id):
+                st.success("Expense deleted!")
+                st.rerun()
+            else:
+                st.error("Failed to delete expense.")
 
     # Edit form (if editing)
     if "editing_expense" in st.session_state:
         render_edit_form(st.session_state.editing_expense)
+
 
 
 def render_edit_form(expense):

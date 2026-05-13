@@ -143,6 +143,16 @@ class ExpenseModel:
         except Exception as e:
             print(f"Error deleting expense: {e}")
             return False
+
+    @staticmethod
+    def get_expense_by_id(expense_id: str) -> Optional[Dict]:
+        """Fetch a single expense document by its string ID"""
+        db = get_db()
+        try:
+            return db[config.EXPENSES_COLLECTION].find_one({"_id": ObjectId(expense_id)})
+        except Exception as e:
+            print(f"Error fetching expense by id: {e}")
+            return None
     
     @staticmethod
     def get_yearly_monthly_totals(year: int) -> Dict[int, float]:

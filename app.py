@@ -7,7 +7,7 @@ import config
 from components.dashboard import render_dashboard
 from components.settings import render_settings
 from components.transactions import render_transactions
-from components.events import render_events
+from components.payments import render_payments
 from database.event_model import EventModel
 
 
@@ -61,7 +61,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-VALID_PAGES = {"Dashboard", "Transactions", "Settings", "Events"}
+VALID_PAGES = {"Dashboard", "Transactions", "Settings", "Payments"}
 
 # ── Page state: seed from URL query param so reloads land on the right page ──
 if "page" not in st.session_state:
@@ -106,9 +106,9 @@ with st.sidebar:
                  type="primary" if current == "Settings" else "secondary"):
         navigate("Settings")
 
-    if st.button("🗓️ Events", use_container_width=True,
-                 type="primary" if current == "Events" else "secondary"):
-        navigate("Events")
+    if st.button("🗓️ Payments", use_container_width=True,
+                 type="primary" if current == "Payments" else "secondary"):
+        navigate("Payments")
 
     st.markdown("---")
 
@@ -120,8 +120,8 @@ try:
         render_transactions()
     elif st.session_state.page == "Settings":
         render_settings()
-    elif st.session_state.page == "Events":
-        render_events()
+    elif st.session_state.page == "Payments":
+        render_payments()
 except Exception as e:
     st.error(f"An error occurred: {str(e)}")
     st.exception(e)
