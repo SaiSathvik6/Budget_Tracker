@@ -1,6 +1,3 @@
-"""
-Events component – manage and monitor recurring monthly expense events.
-"""
 import calendar
 import streamlit as st
 from datetime import datetime, date
@@ -10,66 +7,39 @@ from utils.helpers import format_currency
 import config
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Main entry point
-# ─────────────────────────────────────────────────────────────────────────────
-
 def render_payments():
-    """Render the Payments management page."""
     st.header("🗓️ Recurring Payments")
     st.markdown(
         "Schedule recurring payment entries that are **automatically posted** "
         "on a chosen day every month."
     )
-
-    # ── Run due events automatically on page load ────────────────────────────
     _auto_run_scheduler()
-
     st.divider()
 
-    tab1, tab2, tab3 = st.tabs(
-        ["📋 My Payments", "➕ Add Payment", "⚡ Scheduler"]
-    )
-
+    tab1, tab2, tab3 = st.tabs(["📋 My Payments", "➕ Add Payment", "⚡ Scheduler"])
     with tab1:
         render_event_list()
-
     with tab2:
         render_add_event_form()
-
     with tab3:
         render_scheduler_panel()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Scheduler auto-run (called once per page load)
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _auto_run_scheduler():
-    """Silently execute any events that are due today (idempotent)."""
     results = EventModel.run_due_events()
     executed = [r for r in results if r["status"] == "executed"]
     if executed:
         names = ", ".join(r["event"]["title"] for r in executed)
-        st.success(
-            f"✅ **Auto-executed {len(executed)} payment(s) this month:** {names}"
-        )
+        st.success(f"✅ **Auto-executed {len(executed)} payment(s) this month:** {names}")
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Tab 1 – Event List
-# ─────────────────────────────────────────────────────────────────────────────
 
 def render_event_list():
-    """Display all recurring events with inline controls."""
     events = EventModel.get_all_events()
-
     if not events:
         st.info("No recurring payments yet. Go to **Add Payment** to create one.")
         return
 
-    now = datetime.now()
-    today = now.date()
+    today = date.today()
 
     for event in events:
         event_id = str(event["_id"])
@@ -81,47 +51,31 @@ def render_event_list():
         already_done = EventModel.has_been_executed(event_id, today.year, today.month)
         is_active = event.get("is_active", True)
 
-        # ── Card header colour ───────────────────────────────────────────────
         if not is_active:
-            badge = "⏸️ Paused"
-            border_color = "#555"
+            badge, border_color = "⏸️ Paused", "#555"
         elif already_done:
-            badge = "✅ Done this month"
-            border_color = "#2ecc71"
+            badge, border_color = "✅ Done this month", "#2ecc71"
         elif today == due_date:
-            badge = "🔄 Executing today"
-            border_color = "#f39c12"
+            badge, border_color = "🔄 Executing today", "#f39c12"
         elif today < due_date:
-            badge = f"⏳ Due on {due_date.strftime('%d %b')} (this month)"
-            border_color = "#3498db"
+            badge, border_color = f"⏳ Due on {due_date.strftime('%d %b')} (this month)", "#3498db"
         else:
-            # today > due_date and not yet executed — window passed
-            import calendar as _cal
             if today.month == 12:
                 nd = date(today.year + 1, 1, min(day, 31))
             else:
-                nm_last = _cal.monthrange(today.year, today.month + 1)[1]
+                nm_last = calendar.monthrange(today.year, today.month + 1)[1]
                 nd = date(today.year, today.month + 1, min(day, nm_last))
-            badge = f"🔜 Next month ({nd.strftime('%d %b %Y')})"
-            border_color = "#9b59b6"
+            badge, border_color = f"🔜 Next month ({nd.strftime('%d %b %Y')})", "#9b59b6"
 
         with st.container():
             st.markdown(
-                f"""
-                <div style="border-left: 4px solid {border_color};
-                            padding: 0.6rem 1rem;
-                            margin-bottom: 0.5rem;
-                            border-radius: 6px;
-                            background: rgba(255,255,255,0.04);">
-                    <span style="font-size:1.05rem; font-weight:600;">
-                        {event['title']}
-                    </span>
+                f"""<div style="border-left: 4px solid {border_color};
+                            padding: 0.6rem 1rem; margin-bottom: 0.5rem;
+                            border-radius: 6px; background: rgba(255,255,255,0.04);">
+                    <span style="font-size:1.05rem; font-weight:600;">{event['title']}</span>
                     &nbsp;&nbsp;
-                    <span style="font-size:0.82rem; color:#aaa;">
-                        {badge}
-                    </span>
-                </div>
-                """,
+                    <span style="font-size:0.82rem; color:#aaa;">{badge}</span>
+                </div>""",
                 unsafe_allow_html=True,
             )
 
@@ -135,19 +89,15 @@ def render_event_list():
                     f"**Day:** {day}{_ordinal(day)} of every month  |  "
                     f"**Note:** {desc}"
                 )
-
-                # Execution history (collapsed)
                 history = EventModel.get_execution_history(event_id)
                 if history:
                     with st.expander(f"📜 Execution history ({len(history)} entries)"):
                         for h in history[:12]:
-                            yr, mo = h["year"], h["month"]
-                            month_name = calendar.month_abbr[mo]
                             executed_at = h.get("executed_at", "")
                             if isinstance(executed_at, datetime):
                                 executed_at = executed_at.strftime("%d %b %Y %H:%M")
                             st.markdown(
-                                f"- **{month_name} {yr}** — executed at {executed_at}"
+                                f"- **{calendar.month_abbr[h['month']]} {h['year']}** — executed at {executed_at}"
                             )
 
             with col_actions:
@@ -170,22 +120,19 @@ def render_event_list():
                     st.session_state[f"confirm_del_{event_id}"] = True
                     st.rerun()
 
-                # Confirm delete
                 if st.session_state.get(f"confirm_del_{event_id}"):
                     st.warning("Are you sure?")
                     c1, c2 = st.columns(2)
                     with c1:
                         if st.button("Yes", key=f"yes_{event_id}"):
                             EventModel.delete_event(event_id)
-                            if f"confirm_del_{event_id}" in st.session_state:
-                                del st.session_state[f"confirm_del_{event_id}"]
+                            del st.session_state[f"confirm_del_{event_id}"]
                             st.rerun()
                     with c2:
                         if st.button("No", key=f"no_{event_id}"):
                             del st.session_state[f"confirm_del_{event_id}"]
                             st.rerun()
 
-        # ── Inline edit form ─────────────────────────────────────────────────
         if st.session_state.get("editing_event") == event_id:
             _render_edit_form(event)
 
@@ -193,7 +140,6 @@ def render_event_list():
 
 
 def _render_edit_form(event):
-    """Inline edit form for an existing event."""
     event_id = str(event["_id"])
     categories = CategoryModel.get_all_categories()
 
@@ -217,7 +163,6 @@ def _render_edit_form(event):
                 min_value=1,
                 max_value=28,
                 value=int(event["day_of_month"]),
-                help="Use 28 max so it works in February too.",
             )
         description = st.text_input("Description / Note", value=event.get("description", ""))
         is_active = st.checkbox("Active", value=event.get("is_active", True))
@@ -234,9 +179,7 @@ def _render_edit_form(event):
         elif amount <= 0:
             st.error("Amount must be positive.")
         else:
-            ok = EventModel.update_event(
-                event_id, title, category, amount, day_of_month, description, is_active
-            )
+            ok = EventModel.update_event(event_id, title, category, amount, day_of_month, description, is_active)
             if ok:
                 st.success("✅ Payment updated!")
                 del st.session_state["editing_event"]
@@ -249,29 +192,18 @@ def _render_edit_form(event):
         st.rerun()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Tab 2 – Add Event Form
-# ─────────────────────────────────────────────────────────────────────────────
-
 def render_add_event_form():
-    """Form to create a new recurring payment."""
     st.subheader("➕ Create Recurring Payment")
     st.markdown(
         "Every payment you create will **automatically generate an expense entry** "
         "on the chosen day of each month."
     )
-
     categories = CategoryModel.get_all_categories()
 
     with st.form("add_event_form", clear_on_submit=True):
         col1, col2 = st.columns(2)
-
         with col1:
-            title = st.text_input(
-                "Payment Name *",
-                placeholder="e.g. Monthly Rent, Netflix",
-                help="A short, descriptive label for this recurring payment.",
-            )
+            title = st.text_input("Payment Name *", placeholder="e.g. Monthly Rent, Netflix")
             amount = st.number_input(
                 f"Amount ({config.CURRENCY_SYMBOL}) *",
                 min_value=0.01,
@@ -279,7 +211,6 @@ def render_add_event_form():
                 step=0.01,
                 format="%.2f",
             )
-
         with col2:
             category = st.selectbox("Category *", categories)
             day_of_month = st.number_input(
@@ -287,17 +218,9 @@ def render_add_event_form():
                 min_value=1,
                 max_value=28,
                 value=1,
-                help=(
-                    "The day each month this expense is posted. "
-                    "Max 28 so it's valid every month including February."
-                ),
+                help="Max 28 so it's valid every month including February.",
             )
-
-        description = st.text_input(
-            "Description / Note",
-            placeholder="Optional extra detail",
-        )
-
+        description = st.text_input("Description / Note", placeholder="Optional extra detail")
         submitted = st.form_submit_button("🗓️ Create Payment", use_container_width=True, type="primary")
 
     if submitted:
@@ -314,29 +237,21 @@ def render_add_event_form():
                 st.error("❌ Failed to create payment. Please try again.")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Tab 3 – Scheduler Panel
-# ─────────────────────────────────────────────────────────────────────────────
-
 def render_scheduler_panel():
-    """Show scheduler status and allow manual trigger."""
     st.subheader("⚡ Scheduler Status")
 
+    today = date.today()
     now = datetime.now()
-    today = now.date()
     st.markdown(
-        f"**Today:** {today.strftime('%A, %d %B %Y')}  |  "
-        f"**Time:** {now.strftime('%H:%M')}"
+        f"**Today:** {today.strftime('%A, %d %B %Y')}  |  **Time:** {now.strftime('%H:%M')}"
     )
     st.divider()
 
     results = EventModel.run_due_events()
-
     if not results:
         st.info("No active recurring payments found. Add one in the **Add Payment** tab.")
         return
 
-    # Summary counts
     counts = {"executed": 0, "skipped": 0, "pending": 0, "next_month": 0, "failed": 0}
     for r in results:
         counts[r["status"]] += 1
@@ -351,31 +266,19 @@ def render_scheduler_panel():
     st.divider()
     st.markdown("#### Payment-by-Payment Status")
 
-    status_icon = {
-        "executed": "✅",
-        "skipped": "⏭️",
-        "pending": "⏳",
-        "next_month": "🔜",
-        "failed": "❌",
-    }
-
+    status_icon = {"executed": "✅", "skipped": "⏭️", "pending": "⏳", "next_month": "🔜", "failed": "❌"}
     for r in results:
         ev = r["event"]
-        icon = status_icon.get(r["status"], "❓")
-        due = r["due_date"].strftime("%d %b")
         next_due = r.get("next_due")
-        next_due_str = (
-            f" · next: {next_due.strftime('%d %b %Y')}" if next_due else ""
-        )
+        next_due_str = f" · next: {next_due.strftime('%d %b %Y')}" if next_due else ""
         st.markdown(
-            f"{icon} **{ev['title']}** — {r['reason']}  "
+            f"{status_icon.get(r['status'], '❓')} **{ev['title']}** — {r['reason']}  "
             f"<span style='color:#888;font-size:0.85rem;'>"
-            f"(scheduled {due}{next_due_str}, {format_currency(ev['amount'])} / month)</span>",
+            f"(scheduled {r['due_date'].strftime('%d %b')}{next_due_str}, {format_currency(ev['amount'])} / month)</span>",
             unsafe_allow_html=True,
         )
 
     st.divider()
-
     st.markdown("#### 🔁 Force Re-run This Month")
     st.warning(
         "⚠️ This will re-create expense entries for **all active payments** even if they "
@@ -394,12 +297,7 @@ def render_scheduler_panel():
         st.rerun()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _ordinal(n: int) -> str:
-    """Return ordinal suffix for a number (1→'st', 2→'nd', etc.)."""
     if 11 <= (n % 100) <= 13:
         return "th"
     return {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
