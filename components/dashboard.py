@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import config
 from database.models import ExpenseModel
+from database.investment_model import InvestmentModel
 from utils.helpers import format_currency, get_month_name, get_month_start_end
 
 
@@ -59,7 +60,7 @@ def render_dashboard():
 
     chart_tab = st.radio(
         "View",
-        options=["📈 Daily Trend", "📊 Monthly Comparison", "📅 Yearly Overview", "🥧 Category Breakdown"],
+        options=["📈 Daily Trend", "📊 Monthly Comparison", "📅 Yearly Overview", "🥧 Category Breakdown", "💼 Investment Breakdown"],
         horizontal=True,
         key="dashboard_chart_tab",
         label_visibility="collapsed",
@@ -75,17 +76,26 @@ def render_dashboard():
         render_yearly_overview()
     elif chart_tab == "🥧 Category Breakdown":
         render_category_breakdown(start_date, end_date, filter_label)
+    elif chart_tab == "💼 Investment Breakdown":
+        render_investment_breakdown(start_date, end_date, filter_label)
 
     st.divider()
 
 
 def render_kpi_cards(start_date, end_date, filter_label):
     expenses = ExpenseModel.get_expenses(start_date, end_date) if (start_date and end_date) else ExpenseModel.get_expenses()
-    col1, col2 = st.columns(2)
+    investments = InvestmentModel.get_investments(start_date, end_date) if (start_date and end_date) else InvestmentModel.get_investments()
+    total_expenses = sum(e["amount"] for e in expenses)
+    total_investments = sum(i["amount"] for i in investments)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("💸 Total Expenses", format_currency(sum(e["amount"] for e in expenses)))
+        st.metric("💸 Total Expenses", format_currency(total_expenses))
     with col2:
-        st.metric("📊 Transactions", str(len(expenses)))
+        st.metric("📊 Expense Entries", str(len(expenses)))
+    with col3:
+        st.metric("📈 Total Invested", format_currency(total_investments))
+    with col4:
+        st.metric("🗂️ Investment Entries", str(len(investments)))
 
 
 def render_daily_trend(start_date, end_date, filter_label):
@@ -115,76 +125,91 @@ def render_daily_trend(start_date, end_date, filter_label):
 
 
 def render_monthly_comparison():
-    st.subheader("Monthly Expense Comparison (Last 6 Months)")
+    st.subheader("Monthly Comparison (Last 6 Months)")
 
     now = datetime.now()
     monthly_data = []
 
     for i in range(5, -1, -1):
         month_date = now - timedelta(days=30 * i)
-        total = ExpenseModel.get_monthly_total(month_date.year, month_date.month)
-        if total > 0:
-            monthly_data.append({
-                "month": f"{get_month_name(month_date.month)} {month_date.year}",
-                "amount": total,
-            })
+        label = f"{get_month_name(month_date.month)} {month_date.year}"
+        expense_total = ExpenseModel.get_monthly_total(month_date.year, month_date.month)
+        investment_total = InvestmentModel.get_monthly_total(month_date.year, month_date.month)
+        if expense_total > 0 or investment_total > 0:
+            monthly_data.append({"month": label, "amount": expense_total, "type": "Expenses"})
+            monthly_data.append({"month": label, "amount": investment_total, "type": "Investments"})
 
     if not monthly_data:
-        st.info("No expense data available for the last 6 months.")
+        st.info("No data available for the last 6 months.")
         return
 
     fig = px.bar(
         pd.DataFrame(monthly_data),
         x="month",
         y="amount",
-        title="Monthly Spending Comparison",
-        labels={"month": "Month", "amount": f"Amount ({config.CURRENCY_SYMBOL})"},
-        color="amount",
-        color_continuous_scale="Teal",
+        color="type",
+        barmode="group",
+        title="Monthly Expenses vs Investments (Last 6 Months)",
+        labels={"month": "Month", "amount": f"Amount ({config.CURRENCY_SYMBOL})", "type": ""},
+        color_discrete_map={"Expenses": "#FF6B6B", "Investments": "#6C5CE7"},
     )
-    fig.update_layout(showlegend=False, plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+    fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
     st.plotly_chart(fig, use_container_width=True)
 
 
 def render_yearly_overview():
-    st.subheader("Yearly Expense Overview")
+    st.subheader("Yearly Overview")
 
-    available_years = ExpenseModel.get_available_years()
+    expense_years = set(ExpenseModel.get_available_years())
+    investment_years = set(InvestmentModel.get_available_years())
+    available_years = sorted(expense_years | investment_years, reverse=True)
+
     if not available_years:
-        st.info("No expense data available yet.")
+        st.info("No data available yet.")
         return
 
     year = st.selectbox("Select Year", options=available_years, index=0, key="yearly_overview_year")
-    monthly_totals = ExpenseModel.get_yearly_monthly_totals(year)
 
-    yearly_data = [
-        {"month": get_month_name(m), "amount": monthly_totals[m]}
-        for m in range(1, 13)
-        if monthly_totals[m] > 0
-    ]
+    expense_totals = ExpenseModel.get_yearly_monthly_totals(year)
+    investment_totals = InvestmentModel.get_yearly_monthly_totals(year)
 
-    if not yearly_data:
-        st.info(f"No expense data available for {year}.")
+    months = [m for m in range(1, 13) if expense_totals[m] > 0 or investment_totals[m] > 0]
+
+    if not months:
+        st.info(f"No data available for {year}.")
         return
 
-    df = pd.DataFrame(yearly_data)
+    month_labels = [get_month_name(m) for m in months]
+
     fig = go.Figure()
     fig.add_trace(go.Scatter(
-        x=df["month"], y=df["amount"],
+        x=month_labels,
+        y=[expense_totals[m] for m in months],
         mode="lines+markers",
         name="Expenses",
-        line=dict(color="#45B7D1", width=3),
+        line=dict(color="#FF6B6B", width=3),
         marker=dict(size=10),
         fill="tozeroy",
-        fillcolor="rgba(69, 183, 209, 0.2)",
+        fillcolor="rgba(255, 107, 107, 0.15)",
+    ))
+    fig.add_trace(go.Scatter(
+        x=month_labels,
+        y=[investment_totals[m] for m in months],
+        mode="lines+markers",
+        name="Investments",
+        line=dict(color="#6C5CE7", width=3),
+        marker=dict(size=10),
+        fill="tozeroy",
+        fillcolor="rgba(108, 92, 231, 0.15)",
     ))
     fig.update_layout(
-        title=f"Monthly Expenses for {year}",
+        title=f"Monthly Expenses vs Investments for {year}",
         xaxis_title="Month",
         yaxis_title=f"Amount ({config.CURRENCY_SYMBOL})",
         hovermode="x unified",
         plot_bgcolor="rgba(0,0,0,0)",
         paper_bgcolor="rgba(0,0,0,0)",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -234,6 +259,56 @@ def render_category_breakdown(start_date, end_date, filter_label):
     st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("Category Summary")
+    df_sorted = df.sort_values("amount", ascending=False).copy()
+    df_sorted["amount"] = df_sorted["amount"].apply(format_currency)
+    st.dataframe(df_sorted, use_container_width=True, hide_index=True)
+
+
+def render_investment_breakdown(start_date, end_date, filter_label):
+    st.subheader(f"Investment Breakdown ({filter_label})")
+
+    if not start_date or not end_date:
+        investments = InvestmentModel.get_investments()
+        if not investments:
+            st.info("No investments recorded yet.")
+            return
+        category_data: dict = {}
+        for inv in investments:
+            cat = inv["category"]
+            category_data[cat] = category_data.get(cat, 0) + inv["amount"]
+    else:
+        category_data = InvestmentModel.get_category_breakdown(start_date, end_date)
+
+    category_data = {k: v for k, v in category_data.items() if v > 0}
+    if not category_data:
+        st.info(f"No investments recorded for {filter_label}.")
+        return
+
+    df = pd.DataFrame(list(category_data.items()), columns=["category", "amount"])
+
+    color_map = config.INVESTMENT_CHART_COLORS.copy()
+    for cat in df["category"].unique():
+        if cat not in color_map:
+            color_map[cat] = "#B2BEC3"
+
+    fig = px.pie(
+        df,
+        values="amount",
+        names="category",
+        title=f"Investment by Category - {filter_label}",
+        color="category",
+        color_discrete_map=color_map,
+        hole=0.4,
+    )
+    fig.update_traces(
+        textposition="inside",
+        textinfo="percent+label",
+        hovertemplate="<b>%{label}</b><br>Amount: ₹%{value:,.2f}<br>Percentage: %{percent}",
+    )
+    fig.update_layout(showlegend=True, legend=dict(orientation="v", yanchor="middle", y=0.5))
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Investment Summary")
     df_sorted = df.sort_values("amount", ascending=False).copy()
     df_sorted["amount"] = df_sorted["amount"].apply(format_currency)
     st.dataframe(df_sorted, use_container_width=True, hide_index=True)

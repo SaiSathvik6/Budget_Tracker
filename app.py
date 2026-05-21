@@ -4,6 +4,7 @@ from components.dashboard import render_dashboard
 from components.settings import render_settings
 from components.transactions import render_transactions
 from components.payments import render_payments
+from components.investments import render_investments
 from database.event_model import EventModel
 
 
@@ -42,7 +43,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-VALID_PAGES = {"Dashboard", "Transactions", "Settings", "Payments"}
+VALID_PAGES = {"Dashboard", "Transactions", "Investments", "Settings", "Payments"}
 
 if "page" not in st.session_state:
     qp = st.query_params.get("page", "Dashboard")
@@ -76,12 +77,15 @@ with st.sidebar:
     if st.button("💳 Transactions", use_container_width=True,
                  type="primary" if current == "Transactions" else "secondary"):
         navigate("Transactions")
-    if st.button("⚙️ Settings", use_container_width=True,
-                 type="primary" if current == "Settings" else "secondary"):
-        navigate("Settings")
+    if st.button("📈 Investments", use_container_width=True,
+                 type="primary" if current == "Investments" else "secondary"):
+        navigate("Investments")
     if st.button("🗓️ Payments", use_container_width=True,
                  type="primary" if current == "Payments" else "secondary"):
         navigate("Payments")
+    if st.button("⚙️ Settings", use_container_width=True,
+                 type="primary" if current == "Settings" else "secondary"):
+        navigate("Settings")
 
     st.markdown("---")
 
@@ -90,10 +94,12 @@ try:
         render_dashboard()
     elif st.session_state.page == "Transactions":
         render_transactions()
-    elif st.session_state.page == "Settings":
-        render_settings()
+    elif st.session_state.page == "Investments":
+        render_investments()
     elif st.session_state.page == "Payments":
         render_payments()
+    elif st.session_state.page == "Settings":
+        render_settings()
 except Exception as e:
     st.error(f"An error occurred: {str(e)}")
     st.exception(e)

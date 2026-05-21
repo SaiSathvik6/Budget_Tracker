@@ -6,6 +6,7 @@ load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 DATABASE_NAME = "budget_tracker"
 EXPENSES_COLLECTION = "expenses"
+INVESTMENTS_COLLECTION = "investments"
 
 CURRENCY_SYMBOL = "₹"
 
@@ -18,6 +19,28 @@ CATEGORIES = [
     "Other",
 ]
 
+INVESTMENT_CATEGORIES = [
+    "Mutual Fund",
+    "SIP",
+    "Stocks",
+    "PPF",
+    "NPS",
+    "Gold",
+    "Fixed Deposit",
+    "Other Investment",
+]
+
+INVESTMENT_CHART_COLORS = {
+    "Mutual Fund": "#6C5CE7",
+    "SIP": "#A29BFE",
+    "Stocks": "#00B894",
+    "PPF": "#00CEC9",
+    "NPS": "#FDCB6E",
+    "Gold": "#E17055",
+    "Fixed Deposit": "#74B9FF",
+    "Other Investment": "#B2BEC3",
+}
+
 CHART_COLORS = {
     "Food": "#FF6B6B",
     "Transport": "#4ECDC4",
@@ -27,6 +50,6 @@ CHART_COLORS = {
     "Other": "#C7CEEA",
 }
 
-PAGE_TITLE = "Budget Tracker"
-PAGE_ICON = "💰"
+PAGE_TITLE = "Expense Tracker"
+PAGE_ICON = "📊"
 LAYOUT = "wide"

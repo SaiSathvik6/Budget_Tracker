@@ -3,8 +3,15 @@ import streamlit as st
 from datetime import datetime, date
 from database.event_model import EventModel
 from database.category_model import CategoryModel
+from database.investment_category_model import InvestmentCategoryModel
 from utils.helpers import format_currency
 import config
+
+
+def _categories_for_type(event_type: str):
+    if event_type == "investment":
+        return InvestmentCategoryModel.get_all_categories()
+    return CategoryModel.get_all_categories()
 
 
 def render_payments():
@@ -83,8 +90,11 @@ def render_event_list():
 
             with col_info:
                 desc = event.get("description", "") or "—"
+                etype = event.get("event_type", "expense")
+                etype_label = "📈 Investment" if etype == "investment" else "💸 Expense"
                 st.markdown(
                     f"**Amount:** {format_currency(event['amount'])}  |  "
+                    f"**Type:** {etype_label}  |  "
                     f"**Category:** {event['category']}  |  "
                     f"**Day:** {day}{_ordinal(day)} of every month  |  "
                     f"**Note:** {desc}"
@@ -141,10 +151,19 @@ def render_event_list():
 
 def _render_edit_form(event):
     event_id = str(event["_id"])
-    categories = CategoryModel.get_all_categories()
+    current_type = event.get("event_type", "expense")
 
     st.markdown("#### ✏️ Edit Payment")
     with st.form(f"edit_form_{event_id}"):
+        event_type = st.radio(
+            "Payment Type",
+            options=["expense", "investment"],
+            format_func=lambda x: "💸 Expense" if x == "expense" else "📈 Investment",
+            index=0 if current_type == "expense" else 1,
+            horizontal=True,
+        )
+        categories = _categories_for_type(event_type)
+
         col1, col2 = st.columns(2)
         with col1:
             title = st.text_input("Payment Name", value=event["title"])
@@ -179,7 +198,7 @@ def _render_edit_form(event):
         elif amount <= 0:
             st.error("Amount must be positive.")
         else:
-            ok = EventModel.update_event(event_id, title, category, amount, day_of_month, description, is_active)
+            ok = EventModel.update_event(event_id, title, category, amount, day_of_month, description, is_active, event_type)
             if ok:
                 st.success("✅ Payment updated!")
                 del st.session_state["editing_event"]
@@ -195,15 +214,22 @@ def _render_edit_form(event):
 def render_add_event_form():
     st.subheader("➕ Create Recurring Payment")
     st.markdown(
-        "Every payment you create will **automatically generate an expense entry** "
+        "Every payment you create will **automatically generate an expense or investment entry** "
         "on the chosen day of each month."
     )
-    categories = CategoryModel.get_all_categories()
 
     with st.form("add_event_form", clear_on_submit=True):
+        event_type = st.radio(
+            "Payment Type",
+            options=["expense", "investment"],
+            format_func=lambda x: "💸 Expense" if x == "expense" else "📈 Investment",
+            horizontal=True,
+        )
+        categories = _categories_for_type(event_type)
+
         col1, col2 = st.columns(2)
         with col1:
-            title = st.text_input("Payment Name *", placeholder="e.g. Monthly Rent, Netflix")
+            title = st.text_input("Payment Name *", placeholder="e.g. Monthly Rent, Netflix, SIP")
             amount = st.number_input(
                 f"Amount ({config.CURRENCY_SYMBOL}) *",
                 min_value=0.01,
@@ -229,7 +255,7 @@ def render_add_event_form():
         elif amount <= 0:
             st.error("❌ Amount must be greater than zero.")
         else:
-            ok = EventModel.create_event(title, category, amount, int(day_of_month), description)
+            ok = EventModel.create_event(title, category, amount, int(day_of_month), description, event_type=event_type)
             if ok:
                 st.success(f"✅ Recurring payment **'{title.strip()}'** created successfully!")
                 st.balloons()

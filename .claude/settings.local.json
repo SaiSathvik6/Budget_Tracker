@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\SS\\\\Documents\\\\Expenses\" -Exclude venv -Recurse -File)",
+      "Bash(Select-Object FullName)"
+    ]
+  }
+}

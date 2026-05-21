@@ -19,6 +19,7 @@ class EventModel:
         day_of_month: int,
         description: str = "",
         is_active: bool = True,
+        event_type: str = "expense",
     ) -> bool:
         db = get_db()
         try:
@@ -29,6 +30,7 @@ class EventModel:
                 "day_of_month": day_of_month,
                 "description": description.strip(),
                 "is_active": is_active,
+                "event_type": event_type,
                 "created_at": datetime.now(),
                 "updated_at": datetime.now(),
             })
@@ -64,6 +66,7 @@ class EventModel:
         day_of_month: int,
         description: str,
         is_active: bool,
+        event_type: str = "expense",
     ) -> bool:
         db = get_db()
         try:
@@ -76,6 +79,7 @@ class EventModel:
                     "day_of_month": day_of_month,
                     "description": description.strip(),
                     "is_active": is_active,
+                    "event_type": event_type,
                     "updated_at": datetime.now(),
                 }},
             )
@@ -158,6 +162,7 @@ class EventModel:
     @staticmethod
     def run_due_events(force: bool = False) -> List[Dict]:
         from database.models import ExpenseModel
+        from database.investment_model import InvestmentModel
 
         today = date.today()
         results = []
@@ -165,6 +170,7 @@ class EventModel:
         for event in EventModel.get_active_events():
             event_id = str(event["_id"])
             day = event["day_of_month"]
+            event_type = event.get("event_type", "expense")
 
             last_day = calendar.monthrange(today.year, today.month)[1]
             effective_day = min(day, last_day)
@@ -199,23 +205,34 @@ class EventModel:
                                  "due_date": due_date, "next_due": next_due})
                 continue
 
-            expense_date = datetime(today.year, today.month, effective_day)
+            entry_date = datetime(today.year, today.month, effective_day)
             desc = event.get("description") or event["title"]
-            success = ExpenseModel.create_expense(
-                date=expense_date,
-                category=event["category"],
-                description=f"[Auto] {desc}",
-                amount=event["amount"],
-            )
+
+            if event_type == "investment":
+                success = InvestmentModel.create_investment(
+                    date=entry_date,
+                    category=event["category"],
+                    description=f"[Auto] {desc}",
+                    amount=event["amount"],
+                )
+                entry_label = "Investment"
+            else:
+                success = ExpenseModel.create_expense(
+                    date=entry_date,
+                    category=event["category"],
+                    description=f"[Auto] {desc}",
+                    amount=event["amount"],
+                )
+                entry_label = "Expense"
 
             if success:
                 EventModel.mark_executed(event_id, today.year, today.month)
                 results.append({"event": event, "status": "executed",
-                                 "reason": f"Expense created for {due_date.strftime('%d %b %Y')}",
+                                 "reason": f"{entry_label} created for {due_date.strftime('%d %b %Y')}",
                                  "due_date": due_date, "next_due": next_due})
             else:
                 results.append({"event": event, "status": "failed",
-                                 "reason": "Failed to create expense — will retry next app load",
+                                 "reason": f"Failed to create {entry_label.lower()} — will retry next app load",
                                  "due_date": due_date, "next_due": next_due})
 
         return results
@@ -223,6 +240,7 @@ class EventModel:
     @staticmethod
     def execute_single_event(event_id: str) -> bool:
         from database.models import ExpenseModel
+        from database.investment_model import InvestmentModel
         db = get_db()
         try:
             event = db[EVENTS_COLLECTION].find_one({"_id": ObjectId(event_id)})
@@ -232,15 +250,25 @@ class EventModel:
             today = date.today()
             day = event["day_of_month"]
             effective_day = min(day, calendar.monthrange(today.year, today.month)[1])
-            expense_date = datetime(today.year, today.month, effective_day)
+            entry_date = datetime(today.year, today.month, effective_day)
             desc = event.get("description") or event["title"]
+            event_type = event.get("event_type", "expense")
 
-            success = ExpenseModel.create_expense(
-                date=expense_date,
-                category=event["category"],
-                description=f"[Manual] {desc}",
-                amount=event["amount"],
-            )
+            if event_type == "investment":
+                success = InvestmentModel.create_investment(
+                    date=entry_date,
+                    category=event["category"],
+                    description=f"[Manual] {desc}",
+                    amount=event["amount"],
+                )
+            else:
+                success = ExpenseModel.create_expense(
+                    date=entry_date,
+                    category=event["category"],
+                    description=f"[Manual] {desc}",
+                    amount=event["amount"],
+                )
+
             if success:
                 EventModel.mark_executed(event_id, today.year, today.month)
                 return True

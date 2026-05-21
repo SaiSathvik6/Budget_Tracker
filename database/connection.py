@@ -44,11 +44,11 @@ class DatabaseConnection:
             expenses.create_index([("date", DESCENDING)])
             expenses.create_index([("category", ASCENDING), ("date", DESCENDING)])
             
-            # Income collection indexes
-            income = self._db[config.INCOME_COLLECTION]
-            income.create_index([("date", DESCENDING)])
-            income.create_index([("source", ASCENDING), ("date", DESCENDING)])
-            
+            # Investment collection indexes
+            investments = self._db[config.INVESTMENTS_COLLECTION]
+            investments.create_index([("date", DESCENDING)])
+            investments.create_index([("category", ASCENDING), ("date", DESCENDING)])
+
         except Exception as e:
             st.warning(f"Index creation warning: {e}")
     
