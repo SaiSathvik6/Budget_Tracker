@@ -87,3 +87,5 @@ tmp/
 # CSV exports (optional - uncomment if you don't want to track exported data)
 # exports/
 # *.csv
+
+.claude/

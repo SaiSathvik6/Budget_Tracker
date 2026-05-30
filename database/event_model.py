@@ -20,6 +20,7 @@ class EventModel:
         description: str = "",
         is_active: bool = True,
         event_type: str = "expense",
+        frequency: str = "monthly",
     ) -> bool:
         db = get_db()
         try:
@@ -31,6 +32,7 @@ class EventModel:
                 "description": description.strip(),
                 "is_active": is_active,
                 "event_type": event_type,
+                "frequency": frequency,
                 "created_at": datetime.now(),
                 "updated_at": datetime.now(),
             })
@@ -67,6 +69,7 @@ class EventModel:
         description: str,
         is_active: bool,
         event_type: str = "expense",
+        frequency: str = "monthly",
     ) -> bool:
         db = get_db()
         try:
@@ -80,6 +83,7 @@ class EventModel:
                     "description": description.strip(),
                     "is_active": is_active,
                     "event_type": event_type,
+                    "frequency": frequency,
                     "updated_at": datetime.now(),
                 }},
             )
@@ -117,6 +121,10 @@ class EventModel:
         return f"{event_id}_{year}_{month:02d}"
 
     @staticmethod
+    def _daily_execution_key(event_id: str, d: date) -> str:
+        return f"{event_id}_{d.isoformat()}"
+
+    @staticmethod
     def has_been_executed(event_id: str, year: int, month: int) -> bool:
         db = get_db()
         try:
@@ -124,6 +132,16 @@ class EventModel:
             return db[EXECUTIONS_COLLECTION].find_one({"key": key}) is not None
         except Exception as e:
             print(f"Error checking execution: {e}")
+            return False
+
+    @staticmethod
+    def has_been_executed_today(event_id: str, d: date) -> bool:
+        db = get_db()
+        try:
+            key = EventModel._daily_execution_key(event_id, d)
+            return db[EXECUTIONS_COLLECTION].find_one({"key": key}) is not None
+        except Exception as e:
+            print(f"Error checking daily execution: {e}")
             return False
 
     @staticmethod
@@ -149,6 +167,29 @@ class EventModel:
             return False
 
     @staticmethod
+    def mark_executed_daily(event_id: str, d: date, expense_id=None) -> bool:
+        db = get_db()
+        try:
+            key = EventModel._daily_execution_key(event_id, d)
+            db[EXECUTIONS_COLLECTION].update_one(
+                {"key": key},
+                {"$set": {
+                    "key": key,
+                    "event_id": event_id,
+                    "year": d.year,
+                    "month": d.month,
+                    "day": d.day,
+                    "executed_at": datetime.now(),
+                    "expense_id": str(expense_id) if expense_id else None,
+                }},
+                upsert=True,
+            )
+            return True
+        except Exception as e:
+            print(f"Error marking daily execution: {e}")
+            return False
+
+    @staticmethod
     def get_execution_history(event_id: str) -> List[Dict]:
         db = get_db()
         try:
@@ -169,73 +210,132 @@ class EventModel:
 
         for event in EventModel.get_active_events():
             event_id = str(event["_id"])
-            day = event["day_of_month"]
             event_type = event.get("event_type", "expense")
+            frequency = event.get("frequency", "monthly")
 
-            last_day = calendar.monthrange(today.year, today.month)[1]
-            effective_day = min(day, last_day)
-            due_date = date(today.year, today.month, effective_day)
-
-            if today.month == 12:
-                next_due = date(today.year + 1, 1, min(day, 31))
+            if frequency == "daily":
+                results.append(EventModel._run_daily_event(event, today, force, ExpenseModel, InvestmentModel))
             else:
-                nm_last = calendar.monthrange(today.year, today.month + 1)[1]
-                next_due = date(today.year, today.month + 1, min(day, nm_last))
-
-            already_done = EventModel.has_been_executed(event_id, today.year, today.month)
-
-            if already_done and not force:
-                results.append({"event": event, "status": "skipped",
-                                 "reason": "Already executed this month",
-                                 "due_date": due_date, "next_due": next_due})
-                continue
-
-            if today < due_date and not force:
-                results.append({"event": event, "status": "pending",
-                                 "reason": f"Due on {due_date.strftime('%d %b %Y')} (this month)",
-                                 "due_date": due_date, "next_due": next_due})
-                continue
-
-            if today > due_date and not already_done and not force:
-                results.append({"event": event, "status": "next_month",
-                                 "reason": (
-                                     f"Scheduled day ({due_date.strftime('%d %b')}) already passed — "
-                                     f"next execution on {next_due.strftime('%d %b %Y')}"
-                                 ),
-                                 "due_date": due_date, "next_due": next_due})
-                continue
-
-            entry_date = datetime(today.year, today.month, effective_day)
-            desc = event.get("description") or event["title"]
-
-            if event_type == "investment":
-                success = InvestmentModel.create_investment(
-                    date=entry_date,
-                    category=event["category"],
-                    description=f"[Auto] {desc}",
-                    amount=event["amount"],
-                )
-                entry_label = "Investment"
-            else:
-                success = ExpenseModel.create_expense(
-                    date=entry_date,
-                    category=event["category"],
-                    description=f"[Auto] {desc}",
-                    amount=event["amount"],
-                )
-                entry_label = "Expense"
-
-            if success:
-                EventModel.mark_executed(event_id, today.year, today.month)
-                results.append({"event": event, "status": "executed",
-                                 "reason": f"{entry_label} created for {due_date.strftime('%d %b %Y')}",
-                                 "due_date": due_date, "next_due": next_due})
-            else:
-                results.append({"event": event, "status": "failed",
-                                 "reason": f"Failed to create {entry_label.lower()} — will retry next app load",
-                                 "due_date": due_date, "next_due": next_due})
+                results.append(EventModel._run_monthly_event(event, today, force, ExpenseModel, InvestmentModel))
 
         return results
+
+    @staticmethod
+    def _run_daily_event(event, today: date, force: bool, ExpenseModel, InvestmentModel) -> Dict:
+        event_id = str(event["_id"])
+        event_type = event.get("event_type", "expense")
+        already_done = EventModel.has_been_executed_today(event_id, today)
+
+        if already_done and not force:
+            return {
+                "event": event,
+                "status": "skipped",
+                "reason": "Already executed today",
+                "due_date": today,
+                "next_due": None,
+            }
+
+        entry_date = datetime(today.year, today.month, today.day)
+        desc = event.get("description") or event["title"]
+
+        if event_type == "investment":
+            success = InvestmentModel.create_investment(
+                date=entry_date,
+                category=event["category"],
+                description=f"[Auto-Daily] {desc}",
+                amount=event["amount"],
+            )
+            entry_label = "Investment"
+        else:
+            success = ExpenseModel.create_expense(
+                date=entry_date,
+                category=event["category"],
+                description=f"[Auto-Daily] {desc}",
+                amount=event["amount"],
+            )
+            entry_label = "Expense"
+
+        if success:
+            EventModel.mark_executed_daily(event_id, today)
+            return {
+                "event": event,
+                "status": "executed",
+                "reason": f"Daily {entry_label} created for {today.strftime('%d %b %Y')}",
+                "due_date": today,
+                "next_due": None,
+            }
+        return {
+            "event": event,
+            "status": "failed",
+            "reason": f"Failed to create daily {entry_label.lower()} — will retry next app load",
+            "due_date": today,
+            "next_due": None,
+        }
+
+    @staticmethod
+    def _run_monthly_event(event, today: date, force: bool, ExpenseModel, InvestmentModel) -> Dict:
+        event_id = str(event["_id"])
+        day = event["day_of_month"]
+        event_type = event.get("event_type", "expense")
+
+        last_day = calendar.monthrange(today.year, today.month)[1]
+        effective_day = min(day, last_day)
+        due_date = date(today.year, today.month, effective_day)
+
+        if today.month == 12:
+            next_due = date(today.year + 1, 1, min(day, 31))
+        else:
+            nm_last = calendar.monthrange(today.year, today.month + 1)[1]
+            next_due = date(today.year, today.month + 1, min(day, nm_last))
+
+        already_done = EventModel.has_been_executed(event_id, today.year, today.month)
+
+        if already_done and not force:
+            return {"event": event, "status": "skipped",
+                    "reason": "Already executed this month",
+                    "due_date": due_date, "next_due": next_due}
+
+        if today < due_date and not force:
+            return {"event": event, "status": "pending",
+                    "reason": f"Due on {due_date.strftime('%d %b %Y')} (this month)",
+                    "due_date": due_date, "next_due": next_due}
+
+        if today > due_date and not already_done and not force:
+            return {"event": event, "status": "next_month",
+                    "reason": (
+                        f"Scheduled day ({due_date.strftime('%d %b')}) already passed — "
+                        f"next execution on {next_due.strftime('%d %b %Y')}"
+                    ),
+                    "due_date": due_date, "next_due": next_due}
+
+        entry_date = datetime(today.year, today.month, effective_day)
+        desc = event.get("description") or event["title"]
+
+        if event_type == "investment":
+            success = InvestmentModel.create_investment(
+                date=entry_date,
+                category=event["category"],
+                description=f"[Auto] {desc}",
+                amount=event["amount"],
+            )
+            entry_label = "Investment"
+        else:
+            success = ExpenseModel.create_expense(
+                date=entry_date,
+                category=event["category"],
+                description=f"[Auto] {desc}",
+                amount=event["amount"],
+            )
+            entry_label = "Expense"
+
+        if success:
+            EventModel.mark_executed(event_id, today.year, today.month)
+            return {"event": event, "status": "executed",
+                    "reason": f"{entry_label} created for {due_date.strftime('%d %b %Y')}",
+                    "due_date": due_date, "next_due": next_due}
+        return {"event": event, "status": "failed",
+                "reason": f"Failed to create {entry_label.lower()} — will retry next app load",
+                "due_date": due_date, "next_due": next_due}
 
     @staticmethod
     def execute_single_event(event_id: str) -> bool:
@@ -248,11 +348,34 @@ class EventModel:
                 return False
 
             today = date.today()
+            event_type = event.get("event_type", "expense")
+            frequency = event.get("frequency", "monthly")
+            desc = event.get("description") or event["title"]
+
+            if frequency == "daily":
+                entry_date = datetime(today.year, today.month, today.day)
+                if event_type == "investment":
+                    success = InvestmentModel.create_investment(
+                        date=entry_date,
+                        category=event["category"],
+                        description=f"[Manual] {desc}",
+                        amount=event["amount"],
+                    )
+                else:
+                    success = ExpenseModel.create_expense(
+                        date=entry_date,
+                        category=event["category"],
+                        description=f"[Manual] {desc}",
+                        amount=event["amount"],
+                    )
+                if success:
+                    EventModel.mark_executed_daily(event_id, today)
+                    return True
+                return False
+
             day = event["day_of_month"]
             effective_day = min(day, calendar.monthrange(today.year, today.month)[1])
             entry_date = datetime(today.year, today.month, effective_day)
-            desc = event.get("description") or event["title"]
-            event_type = event.get("event_type", "expense")
 
             if event_type == "investment":
                 success = InvestmentModel.create_investment(
