@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -131,8 +131,10 @@ def render_monthly_comparison():
     monthly_data = []
 
     for i in range(5, -1, -1):
-        month_date = now - timedelta(days=30 * i)
-        label = f"{get_month_name(month_date.month)} {month_date.year}"
+        month = (now.month - i - 1) % 12 + 1
+        year = now.year + (now.month - i - 1) // 12
+        label = f"{get_month_name(month)} {year}"
+        month_date = datetime(year, month, 1)
         expense_total = ExpenseModel.get_monthly_total(month_date.year, month_date.month)
         investment_total = InvestmentModel.get_monthly_total(month_date.year, month_date.month)
         if expense_total > 0 or investment_total > 0:
